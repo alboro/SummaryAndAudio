@@ -1,6 +1,6 @@
 # FreshRSS Article Summary Extension
 
-This project is a fork of [LiangWei88/xExtension-ArticleSummary](https://github.com/LiangWei88/xExtension-ArticleSummary), updated to better integrate with FreshRSS and to leverage the latest OpenAI API models. In addition to the original summarization capabilities, this version allows users to generate two types of summaries: a concise short summary and a more detailed long summary.
+SummaryAndAudio is a fork of [LiangWei88/xExtension-ArticleSummary](https://github.com/LiangWei88/xExtension-ArticleSummary), updated to better integrate with FreshRSS and to leverage the latest OpenAI API models. In addition to the original summarization capabilities, this version allows users to generate two types of summaries: a concise short summary and a more detailed long summary.
 
 ## Features
 - **Forked and Modernized**: Originates from the LiangWei88 project but refactored for smoother integration and maintenance within FreshRSS.
@@ -16,7 +16,7 @@ This project is a fork of [LiangWei88/xExtension-ArticleSummary](https://github.
 ## Installation
 
 1. **Download the Extension**: Clone or download this repository to your FreshRSS extensions directory.
-2. **Enable the Extension**: Go to the FreshRSS extensions management page and enable the "ArticleSummary" extension.
+2. **Enable the Extension**: Go to the FreshRSS extensions management page and enable the "SummaryAndAudio" extension.
 3. **Configure the Extension**: Navigate to the extension's configuration page to set up your API details.
 
 ## Configuration

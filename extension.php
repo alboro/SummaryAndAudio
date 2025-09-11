@@ -1,5 +1,5 @@
 <?php
-class ArticleSummaryExtension extends Minz_Extension
+class SummaryAndAudioExtension extends Minz_Extension
 {
   private static ?array $i18n = null;
 
@@ -10,7 +10,7 @@ class ArticleSummaryExtension extends Minz_Extension
   public function init()
   {
     $this->registerHook('entry_before_display', array($this, 'addSummaryButton'));
-    $this->registerController('ArticleSummary');
+    $this->registerController('SummaryAndAudio');
     Minz_View::appendStyle($this->getFileUrl('style.css', 'css'));
     Minz_View::appendScript($this->getFileUrl('axios.js', 'js'));
     Minz_View::appendScript($this->getFileUrl('marked.js', 'js'));
@@ -20,14 +20,14 @@ class ArticleSummaryExtension extends Minz_Extension
   public function addSummaryButton($entry)
   {
     $url_summary = Minz_Url::display(array(
-      'c' => 'ArticleSummary',
+      'c' => 'SummaryAndAudio',
       'a' => 'summarize',
       'params' => array(
         'id' => $entry->id()
       )
     ));
     $url_more = Minz_Url::display(array(
-      'c' => 'ArticleSummary',
+      'c' => 'SummaryAndAudio',
       'a' => 'summarize',
       'params' => array(
         'id' => $entry->id(),
@@ -37,7 +37,7 @@ class ArticleSummaryExtension extends Minz_Extension
     $has_more = trim((string)FreshRSS_Context::$user_conf->oai_prompt_2) !== '';
 
     $url_tts = Minz_Url::display(array(
-      'c' => 'ArticleSummary',
+      'c' => 'SummaryAndAudio',
       'a' => 'speak'
     ));
     $icon_tts_play = str_replace('<svg ', '<svg class="oai-tts-icon oai-tts-play" ', file_get_contents(__DIR__ . '/static/img/play.svg'));
