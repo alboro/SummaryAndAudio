@@ -142,7 +142,7 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
     if (!parent || !parent._sequence) return;
     const seq = parent._sequence;
     const nextBtn = seq.buttons[seq.index];
-    if (nextBtn && !nextBtn._audio && !nextBtn._abortController) {
+    if (nextBtn && !nextBtn._audio) {
       ttsButtonClick(nextBtn, false, true);
     }
   };
@@ -238,12 +238,8 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
       return;
     }
     if (forceStop) {
-      if (target._abortController) {
-        target._abortController.abort();
-        target._abortController = null;
-        URL.revokeObjectURL(target._audio.src);
-      }
       target._audio.pause();
+      target._audio.src = '';
       target._audio = null;
       log.textContent = '';
       log.style.display = 'none';
@@ -297,17 +293,7 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
         return;
       }
     } else {
-      if (target._abortController) {
-        target._abortController.abort();
-        target._abortController = null;
-        URL.revokeObjectURL(target._audio.src);
-        target._audio.pause();
-        target._audio = null;
-        log.textContent = '';
-        log.style.display = 'none';
-      } else {
-        target._audio.pause();
-      }
+      target._audio.pause();
       target.classList.remove('oai-playing');
       target.setAttribute('aria-label', readLabel);
       target.setAttribute('title', readLabel);
@@ -343,79 +329,50 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   }
 
   const url = target.dataset.request;
-  const data = new URLSearchParams();
-  data.append('ajax', 'true');
-  data.append('_csrf', context.csrf);
-  data.append('content', text);
+  const form = new URLSearchParams();
+  form.append('ajax', 'true');
+  form.append('_csrf', context.csrf);
+  form.append('content', text);
+
+  const testAudio = document.createElement('audio');
+  let responseFormat = 'opus';
+  if (!testAudio.canPlayType('audio/ogg; codecs=opus')) {
+    if (testAudio.canPlayType('audio/mpeg')) {
+      responseFormat = 'mp3';
+    } else if (testAudio.canPlayType('audio/ogg')) {
+      responseFormat = 'ogg';
+    }
+  }
+  form.append('format', responseFormat);
 
   if (!preload) {
     target.disabled = true;
     log.textContent = msgPrepAudio;
     log.style.display = 'block';
   }
-
   try {
-    const response = await axios.post(url, data, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    const xresp = response.data;
-    if (response.status !== 200 || !xresp.response || !xresp.response.data || xresp.response.error) {
-      throw new Error(msgRequestFailed);
-    }
-
-    const params = xresp.response.data;
-    const body = {
-      model: params.model,
-      voice: params.voice,
-      speed: params.speed,
-      input: params.input,
-      stream: params.stream,
-      response_format: params.response_format
-    };
-
-    if (!('MediaSource' in window) || !MediaSource.isTypeSupported('audio/ogg; codecs=opus')) {
-      const testAudio = document.createElement('audio');
-      if (testAudio.canPlayType('audio/mpeg')) {
-        body.response_format = 'mp3';
-      } else if (testAudio.canPlayType('audio/ogg; codecs=opus')) {
-        body.response_format = 'ogg';
-      }
-    }
-
-    const controller = new AbortController();
-    target._abortController = controller;
-
-    const audioResp = await fetch(params.oai_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${params.oai_key}`
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-
-    if (!audioResp.ok) {
-      throw new Error('Audio request failed');
-    }
-
-    const mimeType = audioResp.headers.get('Content-Type') || 'audio/ogg';
-    let sourceType = mimeType.includes('ogg') ? 'audio/ogg; codecs=opus' : mimeType;
-    if (mimeType === 'audio/opus') {
-      sourceType = 'audio/ogg; codecs=opus';
-    }
-
-    const testAudio = document.createElement('audio');
-    const mseSupported = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(sourceType);
-    if (!mseSupported) {
-      if (testAudio.canPlayType(sourceType)) {
-        const blobUrl = URL.createObjectURL(await audioResp.blob());
-        const audio = new Audio(blobUrl);
-        target._audio = audio;
-        audio.addEventListener('ended', () => {
+    const audio = target._audio || document.createElement('audio');
+    if (!target._audio) {
+      const qs = url.includes('?') ? '&' : '?';
+      const audioUrl = url + qs + form.toString();
+      audio.src = audioUrl;
+      audio.preload = 'auto';
+      audio.load();
+      audio.addEventListener('ended', () => {
+        target.classList.remove('oai-playing');
+        target.setAttribute('aria-label', readLabel);
+        target.setAttribute('title', readLabel);
+        if (target._sequenceParent) {
+          const parent = target._sequenceParent;
+          target._sequenceParent = null;
+          parent._playNextParagraph();
+        }
+      });
+      audio.addEventListener(
+        'error',
+        () => {
+          log.textContent = msgAudioFailed;
+          log.style.display = 'block';
           target.classList.remove('oai-playing');
           target.setAttribute('aria-label', readLabel);
           target.setAttribute('title', readLabel);
@@ -424,155 +381,37 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
             target._sequenceParent = null;
             parent._playNextParagraph();
           }
-        });
-        if (!preload) {
-          target.classList.add('oai-playing');
-          target.setAttribute('aria-label', pauseLabel);
-          target.setAttribute('title', pauseLabel);
-          log.textContent = '';
-          log.style.display = 'none';
-        }
-        target._abortController = null;
-        if (!preload) {
-          try {
-            await audio.play();
-            maybePreloadNext(target);
-          } catch (err) {
-            console.error('Playback failed', err);
-            log.textContent = msgAudioFailed;
-            log.style.display = 'block';
-            target.classList.remove('oai-playing');
-            target.setAttribute('aria-label', readLabel);
-            target.setAttribute('title', readLabel);
-            if (target._sequenceParent) {
-              const parent = target._sequenceParent;
-              target._sequenceParent = null;
-              parent._playNextParagraph();
-            }
-            audio.addEventListener(
-              'canplay',
-              async () => {
-                try {
-                  await audio.play();
-                  target.classList.add('oai-playing');
-                  target.setAttribute('aria-label', pauseLabel);
-                  target.setAttribute('title', pauseLabel);
-                  log.textContent = '';
-                  log.style.display = 'none';
-                  maybePreloadNext(target);
-                } catch (err2) {
-                  console.error('Playback retry failed', err2);
-                }
-              },
-              { once: true }
-            );
-          }
-        }
-        return;
-      }
-      throw new Error('Unsupported audio format');
+        },
+        { once: true }
+      );
     }
-    const mediaSource = new MediaSource();
-    const audioUrl = URL.createObjectURL(mediaSource);
-    const audio = new Audio(audioUrl);
     target._audio = audio;
-    audio.addEventListener('ended', () => {
-      target.classList.remove('oai-playing');
-      target.setAttribute('aria-label', readLabel);
-      target.setAttribute('title', readLabel);
-      if (target._sequenceParent) {
-        const parent = target._sequenceParent;
-        target._sequenceParent = null;
-        parent._playNextParagraph();
-      }
-    });
 
-    mediaSource.addEventListener('sourceopen', async () => {
-      const sourceBuffer = mediaSource.addSourceBuffer(sourceType);
-      const reader = audioResp.body.getReader();
-      let started = false;
+    if (!preload) {
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            sourceBuffer.addEventListener('updateend', () => mediaSource.endOfStream(), { once: true });
-            break;
-          }
-          sourceBuffer.appendBuffer(value);
-          await new Promise(res => sourceBuffer.addEventListener('updateend', res, { once: true }));
-          if (!started && !preload) {
-            try {
-              await audio.play();
-              target.classList.add('oai-playing');
-              target.setAttribute('aria-label', pauseLabel);
-              target.setAttribute('title', pauseLabel);
-              log.textContent = '';
-              log.style.display = 'none';
-              maybePreloadNext(target);
-              started = true;
-            } catch (err) {
-              console.error('Playback failed', err);
-              log.textContent = msgAudioFailed;
-              log.style.display = 'block';
-              target.classList.remove('oai-playing');
-              target.setAttribute('aria-label', readLabel);
-              target.setAttribute('title', readLabel);
-              if (target._sequenceParent) {
-                const parent = target._sequenceParent;
-                target._sequenceParent = null;
-                parent._playNextParagraph();
-              }
-              audio.addEventListener(
-                'canplay',
-                async () => {
-                  try {
-                    await audio.play();
-                    target.classList.add('oai-playing');
-                    target.setAttribute('aria-label', pauseLabel);
-                    target.setAttribute('title', pauseLabel);
-                    log.textContent = '';
-                    log.style.display = 'none';
-                    maybePreloadNext(target);
-                  } catch (err2) {
-                    console.error('Playback retry failed', err2);
-                  }
-                },
-                { once: true }
-              );
-            }
-          }
-        }
+        await audio.play();
+        target.classList.add('oai-playing');
+        target.setAttribute('aria-label', pauseLabel);
+        target.setAttribute('title', pauseLabel);
+        log.textContent = '';
+        log.style.display = 'none';
+        maybePreloadNext(target);
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error(err);
-          if (!preload) {
-            log.textContent = 'Audio failed';
-            log.style.display = 'block';
-            target.classList.remove('oai-playing');
-            target.setAttribute('aria-label', readLabel);
-            target.setAttribute('title', readLabel);
-          }
-        }
-      } finally {
-        target._abortController = null;
+        console.error('Playback failed', err);
+        log.textContent = msgAudioFailed;
+        log.style.display = 'block';
+        target.classList.remove('oai-playing');
+        target.setAttribute('aria-label', readLabel);
+        target.setAttribute('title', readLabel);
       }
-    });
+    }
   } catch (err) {
     console.error(err);
     if (!preload) {
-      log.textContent = err.name === 'AbortError' ? 'Audio canceled' : 'Audio failed';
+      log.textContent = msgAudioFailed;
       log.style.display = 'block';
-      target._audio = null;
-      target._abortController = null;
-      if (target._sequenceParent) {
-        const parent = target._sequenceParent;
-        target._sequenceParent = null;
-        parent._playNextParagraph();
-      }
-    } else {
-      target._audio = null;
-      target._abortController = null;
     }
+    target._audio = null;
   } finally {
     if (!preload) {
       target.disabled = false;

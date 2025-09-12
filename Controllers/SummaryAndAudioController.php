@@ -104,7 +104,6 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
   public function speakAction()
   {
     $this->view->_layout(false);
-    header('Content-Type: application/json');
 
     $oai_url = FreshRSS_Context::$user_conf->oai_url;
     $oai_key = FreshRSS_Context::$user_conf->oai_key;
@@ -116,6 +115,8 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     }
     $speed = max(0.5, min(4, (float)$speed));
     $content = Minz_Request::param('content');
+    $format = Minz_Request::param('format');
+    $format = in_array($format, ['mp3', 'ogg', 'opus']) ? $format : 'opus';
 
     if (
       $this->isEmpty($oai_url) ||
@@ -124,6 +125,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
       $this->isEmpty($voice) ||
       $this->isEmpty($content)
     ) {
+      header('Content-Type: application/json');
       echo json_encode(array(
         'response' => array(
           'data' => 'missing config',
@@ -138,26 +140,84 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     if (!preg_match('/\/v\d+\/?$/', $oai_url)) {
       $oai_url .= '/v1';
     }
+    $tts_url = $oai_url . '/audio/speech';
 
-    $successResponse = array(
-      'response' => array(
-        'data' => array(
-          'oai_url' => $oai_url . '/audio/speech',
-          'oai_key' => $oai_key,
-          'model' => $tts_model,
-          'voice' => $voice,
-          'speed' => $speed,
-          'input' => $content,
-          'stream' => true,
-          'response_format' => 'opus',
+    $headersSent = false;
+    $statusCode = 0;
+    $respContentType = '';
+    $errorBody = '';
+
+    $ch = curl_init($tts_url);
+    $payload = json_encode([
+      'model' => $tts_model,
+      'voice' => $voice,
+      'speed' => $speed,
+      'input' => $content,
+      'format' => $format,
+    ]);
+    curl_setopt_array($ch, [
+      CURLOPT_POST => true,
+      CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $oai_key,
+      ],
+      CURLOPT_POSTFIELDS => $payload,
+      CURLOPT_HEADERFUNCTION => function ($curl, $header) use (&$statusCode, &$respContentType) {
+        $len = strlen($header);
+        if (preg_match('#HTTP/\d+(?:\.\d+)?\s+(\d+)#', $header, $m)) {
+          $statusCode = (int)$m[1];
+        } elseif (stripos($header, 'Content-Type:') === 0) {
+          $respContentType = trim(substr($header, 13));
+        }
+        return $len;
+      },
+      CURLOPT_WRITEFUNCTION => function ($curl, $data) use (&$headersSent, &$statusCode, &$respContentType, &$errorBody) {
+        if (!$headersSent) {
+          if ($statusCode >= 200 && $statusCode < 300) {
+            $type = $respContentType ?: 'audio/ogg';
+            header('Content-Type: ' . $type);
+            header('Cache-Control: no-cache');
+          } else {
+            header('Content-Type: application/json', true, $statusCode ?: 500);
+          }
+          $headersSent = true;
+        }
+        if ($statusCode >= 200 && $statusCode < 300) {
+          echo $data;
+          if (function_exists('ob_flush')) {
+            @ob_flush();
+          }
+          flush();
+        } else {
+          $errorBody .= $data;
+        }
+        return strlen($data);
+      },
+    ]);
+
+    $result = curl_exec($ch);
+    if ($result === false && !$headersSent) {
+      $errorBody = curl_error($ch);
+    }
+    curl_close($ch);
+
+    if ($result === false || $statusCode < 200 || $statusCode >= 300) {
+      if (!$headersSent) {
+        header('Content-Type: application/json', true, $statusCode ?: 500);
+      }
+      $msg = 'Audio request failed';
+      $decoded = json_decode($errorBody, true);
+      if ($decoded && isset($decoded['error']['message'])) {
+        $msg = $decoded['error']['message'];
+      }
+      echo json_encode(array(
+        'response' => array(
+          'data' => '',
+          'error' => $msg,
         ),
-        'provider' => 'openai',
-        'error' => null
-      ),
-      'status' => 200
-    );
-
-    echo json_encode($successResponse);
+        'status' => $statusCode ?: 500,
+      ));
+    }
     return;
   }
 
@@ -205,7 +265,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
           'model' => $tts_model,
           'voice' => $voice,
           'speed' => $speed,
-          'response_format' => 'opus',
+          'format' => 'opus',
         ),
         'error' => null
       ),
