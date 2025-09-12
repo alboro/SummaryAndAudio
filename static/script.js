@@ -343,10 +343,21 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   }
 
   const url = target.dataset.request;
-  const data = new URLSearchParams();
-  data.append('ajax', 'true');
-  data.append('_csrf', context.csrf);
-  data.append('content', text);
+  const form = new URLSearchParams();
+  form.append('ajax', 'true');
+  form.append('_csrf', context.csrf);
+  form.append('content', text);
+
+  let responseFormat = 'opus';
+  if (!('MediaSource' in window) || !MediaSource.isTypeSupported('audio/ogg; codecs=opus')) {
+    const testAudio = document.createElement('audio');
+    if (testAudio.canPlayType('audio/mpeg')) {
+      responseFormat = 'mp3';
+    } else if (testAudio.canPlayType('audio/ogg; codecs=opus')) {
+      responseFormat = 'ogg';
+    }
+  }
+  form.append('format', responseFormat);
 
   if (!preload) {
     target.disabled = true;
@@ -355,51 +366,20 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   }
 
   try {
-    const response = await axios.post(url, data, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    const xresp = response.data;
-    if (response.status !== 200 || !xresp.response || !xresp.response.data || xresp.response.error) {
-      throw new Error(msgRequestFailed);
-    }
-
-    const params = xresp.response.data;
-    const body = {
-      model: params.model,
-      voice: params.voice,
-      speed: params.speed,
-      input: params.input,
-      stream: params.stream,
-      response_format: params.response_format
-    };
-
-    if (!('MediaSource' in window) || !MediaSource.isTypeSupported('audio/ogg; codecs=opus')) {
-      const testAudio = document.createElement('audio');
-      if (testAudio.canPlayType('audio/mpeg')) {
-        body.response_format = 'mp3';
-      } else if (testAudio.canPlayType('audio/ogg; codecs=opus')) {
-        body.response_format = 'ogg';
-      }
-    }
-
     const controller = new AbortController();
     target._abortController = controller;
 
-    const audioResp = await fetch(params.oai_url, {
+    const audioResp = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${params.oai_key}`
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: JSON.stringify(body),
+      body: form.toString(),
       signal: controller.signal
     });
 
     if (!audioResp.ok) {
-      throw new Error('Audio request failed');
+      throw new Error(msgRequestFailed);
     }
 
     const mimeType = audioResp.headers.get('Content-Type') || 'audio/ogg';

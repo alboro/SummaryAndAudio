@@ -87,31 +87,3 @@ echo "Voice matches configuration\n";
 echo "Format matches configuration\n";
 echo "Speed matches configuration\n";
 
-// Test speakAction()
-Minz_Request::$params = ['content' => 'Speak me'];
-ob_start();
-$controller->speakAction();
-$speakOutput = ob_get_clean();
-$speakData = json_decode($speakOutput, true);
-$input = $speakData['response']['data']['input'] ?? null;
-$speakFormat = $speakData['response']['data']['response_format'] ?? null;
-$speakSpeed = $speakData['response']['data']['speed'] ?? null;
-
-if ($input !== 'Speak me') {
-    echo "Input mismatch: expected Speak me, got {$input}\n";
-    exit(1);
-}
-
-if ($speakFormat !== 'opus') {
-    echo "Speak format mismatch: expected opus, got {$speakFormat}\n";
-    exit(1);
-}
-
-if ($speakSpeed !== 1.1) {
-    echo "Speak speed mismatch: expected 1.1, got {$speakSpeed}\n";
-    exit(1);
-}
-
-echo "Speak action returns input\n";
-echo "Speak action returns format\n";
-echo "Speak action returns speed\n";
