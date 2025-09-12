@@ -5,8 +5,6 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
   public function summarizeAction()
   {
     $this->view->_layout(false);
-    // JSON - Set response header to JSON
-    header('Content-Type: application/json');
 
     $oai_url = FreshRSS_Context::$user_conf->oai_url;
     $oai_key = FreshRSS_Context::$user_conf->oai_key;
@@ -18,11 +16,12 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     $oai_prompt = $use_more ? $oai_prompt_more : $oai_prompt_base;
 
     if (
-      $this->isEmpty($oai_url)
-      || $this->isEmpty($oai_key)
-      || $this->isEmpty($oai_model)
-      || $this->isEmpty($oai_prompt)
+      $this->isEmpty($oai_url) ||
+      $this->isEmpty($oai_key) ||
+      $this->isEmpty($oai_model) ||
+      $this->isEmpty($oai_prompt)
     ) {
+      header('Content-Type: application/json');
       echo json_encode(array(
         'response' => array(
           'data' => 'missing config',
@@ -38,66 +37,115 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     $entry = $entry_dao->searchById($entry_id);
 
     if ($entry === null) {
+      header('Content-Type: application/json');
       echo json_encode(array('status' => 404));
       return;
     }
 
-    $content = $entry->content(); // Replace with article content
+    $content = $entry->content();
+    $markdownContent = $this->htmlToMarkdown($content);
 
-    // $oai_url
-    $oai_url = rtrim($oai_url, '/'); // Remove the trailing slash
-    // Ollama doesn't use versioned endpoints, so avoid appending /v1 for that provider
+    $oai_url = rtrim($oai_url, '/');
     if ($oai_provider !== 'ollama' && !preg_match('/\/v\d+\/?$/', $oai_url)) {
-        $oai_url .= '/v1'; // If there is no version information, add /v1
+      $oai_url .= '/v1';
     }
-    // Open AI Input
-    $successResponse = array(
-      'response' => array(
-        'data' => array(
-          // Determine whether the URL ends with a version. If it does, no version information is added. If not, /v1 is added by default.
-          "oai_url" => $oai_url . '/responses',
-          "oai_key" => $oai_key,
-          "model" => $oai_model,
-          "input" => [
-            [
-              "role" => "system",
-              "content" => $oai_prompt
-            ],
-            [
-              "role" => "user",
-              "content" => "input: \n" . $content,
-            ]
-          ],
-          "reasoning" => [ "effort" => "minimal" ],
-          "max_output_tokens" => 2048, // You can adjust the length of the summary as needed.
-          "temperature" => 1, // gpt-5-nano expects 1
-          "stream" => true
-      ),
-      'provider' => 'openai',
-      'error' => null
-      ),
-      'status' => 200
-    );
 
-    // Ollama API Input
-    if ($oai_provider === "ollama") {
-      $successResponse = array(
-        'response' => array(
-          'data' => array(
-            "oai_url" => rtrim($oai_url, '/') . '/api/generate',
-            "oai_key" => $oai_key,
-            "model" => $oai_model,
-            "system" => $oai_prompt,
-            "prompt" =>  $markdownContent,
-            "stream" => true,
-          ),
-          'provider' => 'ollama',
-          'error' => null
-        ),
-        'status' => 200
-      );
+    $headers = [
+      'Content-Type: application/json',
+      'Authorization: Bearer ' . $oai_key,
+    ];
+
+    if ($oai_provider === 'ollama') {
+      $payload = json_encode([
+        'model' => $oai_model,
+        'system' => $oai_prompt,
+        'prompt' => $markdownContent,
+        'stream' => true,
+      ]);
+      $summaryUrl = rtrim($oai_url, '/') . '/api/generate';
+    } else {
+      $payload = json_encode([
+        'model' => $oai_model,
+        'input' => [
+          [ 'role' => 'system', 'content' => $oai_prompt ],
+          [ 'role' => 'user', 'content' => "input: \n" . $markdownContent ],
+        ],
+        'reasoning' => [ 'effort' => 'minimal' ],
+        'max_output_tokens' => 2048,
+        'temperature' => 1,
+        'stream' => true,
+      ]);
+      $summaryUrl = $oai_url . '/responses';
     }
-    echo json_encode($successResponse);
+
+    header('X-Summary-Provider: ' . $oai_provider);
+
+    $headersSent = false;
+    $statusCode = 0;
+    $respContentType = '';
+    $errorBody = '';
+
+    $ch = curl_init($summaryUrl);
+    curl_setopt_array($ch, [
+      CURLOPT_POST => true,
+      CURLOPT_HTTPHEADER => $headers,
+      CURLOPT_POSTFIELDS => $payload,
+      CURLOPT_HEADERFUNCTION => function ($curl, $header) use (&$statusCode, &$respContentType) {
+        $len = strlen($header);
+        if (preg_match('#HTTP/\d+(?:\.\d+)?\s+(\d+)#', $header, $m)) {
+          $statusCode = (int)$m[1];
+        } elseif (stripos($header, 'Content-Type:') === 0) {
+          $respContentType = trim(substr($header, 13));
+        }
+        return $len;
+      },
+      CURLOPT_WRITEFUNCTION => function ($curl, $data) use (&$headersSent, &$statusCode, &$respContentType, &$errorBody) {
+        if (!$headersSent) {
+          if ($statusCode >= 200 && $statusCode < 300) {
+            $type = $respContentType ?: 'text/plain';
+            header('Content-Type: ' . $type);
+            header('Cache-Control: no-cache');
+          } else {
+            header('Content-Type: application/json', true, $statusCode ?: 500);
+          }
+          $headersSent = true;
+        }
+        if ($statusCode >= 200 && $statusCode < 300) {
+          echo $data;
+          if (function_exists('ob_flush')) {
+            @ob_flush();
+          }
+          flush();
+        } else {
+          $errorBody .= $data;
+        }
+        return strlen($data);
+      },
+    ]);
+
+    $result = curl_exec($ch);
+    if ($result === false && !$headersSent) {
+      $errorBody = curl_error($ch);
+    }
+    curl_close($ch);
+
+    if ($result === false || $statusCode < 200 || $statusCode >= 300) {
+      if (!$headersSent) {
+        header('Content-Type: application/json', true, $statusCode ?: 500);
+      }
+      $msg = 'Summary request failed';
+      $decoded = json_decode($errorBody, true);
+      if ($decoded && isset($decoded['error']['message'])) {
+        $msg = $decoded['error']['message'];
+      }
+      echo json_encode(array(
+        'response' => array(
+          'data' => '',
+          'error' => $msg,
+        ),
+        'status' => $statusCode ?: 500,
+      ));
+    }
     return;
   }
 
