@@ -1,6 +1,6 @@
 <?php
 error_reporting(E_ERROR);
-require __DIR__ . '/../Controllers/ArticleSummaryController.php';
+require __DIR__ . '/../Controllers/SummaryAndAudioController.php';
 
 // Stub classes and functions required by the controller
 class Minz_ActionController {}
@@ -40,7 +40,7 @@ FreshRSS_Context::$user_conf = (object) [
 
 // Capture the output of summarizeAction()
 ob_start();
-$controller = new FreshExtension_ArticleSummary_Controller();
+$controller = new FreshExtension_SummaryAndAudio_Controller();
 $controller->view = new class {
     public function _layout($layout) {}
 };

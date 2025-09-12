@@ -1,6 +1,6 @@
 <?php
 
-class FreshExtension_ArticleSummary_Controller extends Minz_ActionController
+class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
 {
   public function summarizeAction()
   {
