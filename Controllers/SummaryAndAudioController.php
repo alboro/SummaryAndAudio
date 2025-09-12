@@ -164,7 +164,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
       CURLOPT_POSTFIELDS => $payload,
       CURLOPT_HEADERFUNCTION => function ($curl, $header) use (&$statusCode, &$respContentType) {
         $len = strlen($header);
-        if (preg_match('#HTTP/\d+\.\d+\s+(\d+)#', $header, $m)) {
+        if (preg_match('#HTTP/\d+(?:\.\d+)?\s+(\d+)#', $header, $m)) {
           $statusCode = (int)$m[1];
         } elseif (stripos($header, 'Content-Type:') === 0) {
           $respContentType = trim(substr($header, 13));

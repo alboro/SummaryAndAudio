@@ -87,3 +87,23 @@ echo "Voice matches configuration\n";
 echo "Format matches configuration\n";
 echo "Speed matches configuration\n";
 
+// Verify header status code regex supports HTTP/2 responses
+$pattern = '#HTTP/\d+(?:\.\d+)?\s+(\d+)#';
+$headers = [
+    'HTTP/2 200',
+    'HTTP/1.1 404',
+];
+foreach ($headers as $line) {
+    if (!preg_match($pattern, $line, $m)) {
+        echo "Regex failed to match header: {$line}\n";
+        exit(1);
+    }
+    // Ensure captured status is numeric
+    if (!is_numeric($m[1])) {
+        echo "Regex did not capture status code for header: {$line}\n";
+        exit(1);
+    }
+}
+
+echo "Header regex matches HTTP/2 and HTTP/1.x responses\n";
+
