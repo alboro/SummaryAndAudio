@@ -89,41 +89,116 @@ async function summarizeButtonClick(target) {
 
   setOaiState(container, 1, t.preparingRequest, null);
 
-  // This is the address where PHP gets the parameters
   var url = target.dataset.request;
   var data = new URLSearchParams();
   data.append('ajax', 'true');
   data.append('_csrf', context.csrf);
 
   try {
-    const response = await axios.post(url, data, {
+    const response = await fetch(url, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      }
+      },
+      body: data
     });
 
-    const xresp = response.data;
-    console.log(xresp);
-
-    if (response.status !== 200 || !xresp.response || !xresp.response.data) {
+    if (!response.ok) {
       throw new Error(t.requestFailed + ' (1)');
     }
 
-    if (xresp.response.error) {
-      setOaiState(container, 2, xresp.response.data, null);
+    const provider = response.headers.get('X-Summary-Provider') || 'openai';
+    setOaiState(container, 1, provider === 'ollama' ? t.pendingOllama : t.pendingOpenai, null);
+    await streamSummary(container, response, provider);
+  } catch (error) {
+    console.error(error);
+    setOaiState(container, 2, t.requestFailed + ' (2)', null);
+  }
+}
+
+async function streamSummary(container, response, provider) {
+  const t = container.dataset;
+  try {
+    setOaiState(container, 1, t.receivingAnswer, null);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let text = '';
+    let buffer = '';
+    if (provider === 'ollama') {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          setOaiState(container, 0, 'finish', null);
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let endIndex;
+        while ((endIndex = buffer.indexOf('\n')) !== -1) {
+          const jsonString = buffer.slice(0, endIndex).trim();
+          buffer = buffer.slice(endIndex + 1);
+          if (!jsonString) continue;
+          try {
+            const json = JSON.parse(jsonString);
+            if (json.response) {
+              text += json.response;
+              setOaiState(container, 0, null, marked.parse(text));
+            }
+          } catch (e) {
+            console.error('Error parsing JSON:', e, 'Chunk:', jsonString);
+          }
+        }
+      }
     } else {
-      const oaiParams = xresp.response.data;
-      const oaiProvider = xresp.response.provider;
-      setOaiState(container, 1, oaiProvider === 'openai' ? t.pendingOpenai : t.pendingOllama, null);
-      if (oaiProvider === 'openai') {
-        await sendOpenAIRequest(container, oaiParams);
-      } else {
-        await sendOllamaRequest(container, oaiParams);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) {
+            try {
+              const json = JSON.parse(buffer.trim());
+              if (json.output_text) {
+                text += json.output_text;
+                setOaiState(container, 0, null, marked.parse(text));
+              }
+            } catch (e) {
+              console.error('Error parsing final JSON:', e, 'Chunk:', buffer);
+              setOaiState(container, 2, t.requestFailed + ' (3)', null);
+            }
+          }
+          setOaiState(container, 0, 'finish', null);
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let parts = buffer.split(/\n\n/);
+        buffer = parts.pop();
+        for (let part of parts) {
+          const lines = part.trim().split('\n');
+          const dataLine = lines.find(l => l.startsWith('data:'));
+          if (!dataLine) continue;
+          let data = dataLine.slice(5).trim();
+          if (data === '[DONE]') {
+            setOaiState(container, 0, 'finish', null);
+            return;
+          }
+          try {
+            const json = JSON.parse(data);
+            if (json.type === 'response.completed') {
+              setOaiState(container, 0, 'finish', null);
+              return;
+            }
+            const delta = json.delta || json.output_text || '';
+            if (delta) {
+              text += delta;
+              setOaiState(container, 0, null, marked.parse(text));
+            }
+          } catch (e) {
+            console.error('Error parsing JSON:', e, 'Chunk:', data);
+          }
+        }
       }
     }
   } catch (error) {
     console.error(error);
-    setOaiState(container, 2, t.requestFailed + ' (2)', null);
+    setOaiState(container, 2, t.requestFailed + ' (4)', null);
   }
 }
 
@@ -419,135 +494,3 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   }
 }
 
-async function sendOpenAIRequest(container, oaiParams) {
-  const t = container.dataset;
-  try {
-    let body = JSON.parse(JSON.stringify(oaiParams));
-    delete body['oai_url'];
-    delete body['oai_key'];
-    const response = await fetch(oaiParams.oai_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${oaiParams.oai_key}`
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      throw new Error(t.requestFailed + ' (3)');
-    }
-    setOaiState(container, 1, t.receivingAnswer, null);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let text = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.trim()) {
-          try {
-            const json = JSON.parse(buffer.trim());
-            if (json.output_text) {
-              text += json.output_text;
-              setOaiState(container, 0, null, marked.parse(text));
-            }
-          } catch (e) {
-            console.error('Error parsing final JSON:', e, 'Chunk:', buffer);
-            setOaiState(container, 2, t.requestFailed + ' (4)', null);
-          }
-        }
-        setOaiState(container, 0, 'finish', null);
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-
-      // Split buffer into Server-Sent Events
-      let parts = buffer.split(/\n\n/);
-      buffer = parts.pop();
-      for (let part of parts) {
-        const lines = part.trim().split('\n');
-        const dataLine = lines.find(l => l.startsWith('data:'));
-        if (!dataLine) continue;
-        let data = dataLine.slice(5).trim();
-        if (data === '[DONE]') {
-          setOaiState(container, 0, 'finish', null);
-          return;
-        }
-        try {
-          const json = JSON.parse(data);
-          if (json.type === 'response.completed') {
-            setOaiState(container, 0, 'finish', null);
-            return;
-          }
-          const delta = json.delta || json.output_text || '';
-          if (delta) {
-            text += delta;
-            setOaiState(container, 0, null, marked.parse(text));
-          }
-        } catch (e) {
-          console.error('Error parsing JSON:', e, 'Chunk:', data);
-        }
-      }
-    }
-  } catch (error) {
-    console.error(error);
-    setOaiState(container, 2, t.requestFailed + ' (5)', null);
-  }
-}
-
-
-async function sendOllamaRequest(container, oaiParams){
-  const t = container.dataset;
-  try {
-    const response = await fetch(oaiParams.oai_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${oaiParams.oai_key}`
-      },
-      body: JSON.stringify(oaiParams)
-    });
-
-    if (!response.ok) {
-      throw new Error(t.requestFailed + ' (6)');
-    }
-    setOaiState(container, 1, t.receivingAnswer, null);
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let text = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        setOaiState(container, 0, 'finish', null);
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      // Try to process complete JSON objects from the buffer
-      let endIndex;
-      while ((endIndex = buffer.indexOf('\n')) !== -1) {
-        const jsonString = buffer.slice(0, endIndex).trim();
-        try {
-          if (jsonString) {
-            const json = JSON.parse(jsonString);
-            text += json.response
-            setOaiState(container, 0, null, marked.parse(text));
-          }
-        } catch (e) {
-          // If JSON parsing fails, output the error and keep the chunk for future attempts
-          console.error('Error parsing JSON:', e, 'Chunk:', jsonString);
-        }
-        // Remove the processed part from the buffer
-        buffer = buffer.slice(endIndex + 1); // +1 to remove the newline character
-      }
-    }
-  } catch (error) {
-    console.error(error);
-    setOaiState(container, 2, t.requestFailed + ' (7)', null);
-  }
-}

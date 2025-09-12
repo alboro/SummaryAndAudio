@@ -25,10 +25,10 @@ class FreshRSS_Factory {
     }
 }
 
-// Set up configuration with a specific model name
+// Set up configuration with missing key to trigger config error
 FreshRSS_Context::$user_conf = (object) [
     'oai_url' => 'https://api.example.com',
-    'oai_key' => 'test-key',
+    'oai_key' => '', // missing on purpose
     'oai_model' => 'my-configured-model',
     'oai_prompt' => 'prompt',
     'oai_prompt_2' => 'prompt2',
@@ -49,15 +49,17 @@ $output = ob_get_clean();
 
 // Decode the JSON response
 $data = json_decode($output, true);
-$model = $data['response']['data']['model'] ?? null;
+$msg = $data['response']['data'] ?? null;
 
-// Simple assertion
-if ($model !== 'my-configured-model') {
-    echo "Model mismatch: expected my-configured-model, got {$model}\n";
+if ($msg !== 'missing config') {
+    echo "Expected missing config message, got {$msg}\n";
     exit(1);
 }
 
-echo "Model matches configuration\n";
+echo "SummarizeAction reports missing config as expected\n";
+
+// Reset configuration with valid key for TTS test
+FreshRSS_Context::$user_conf->oai_key = 'test-key';
 
 // Test fetchTtsParamsAction()
 ob_start();
