@@ -153,8 +153,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
       'voice' => $voice,
       'speed' => $speed,
       'input' => $content,
-      'stream' => true,
-      'response_format' => $format,
+      'format' => $format,
     ]);
     curl_setopt_array($ch, [
       CURLOPT_POST => true,
@@ -196,10 +195,13 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
       },
     ]);
 
-    curl_exec($ch);
+    $result = curl_exec($ch);
+    if ($result === false && !$headersSent) {
+      $errorBody = curl_error($ch);
+    }
     curl_close($ch);
 
-    if ($statusCode < 200 || $statusCode >= 300) {
+    if ($result === false || $statusCode < 200 || $statusCode >= 300) {
       if (!$headersSent) {
         header('Content-Type: application/json', true, $statusCode ?: 500);
       }
@@ -263,7 +265,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
           'model' => $tts_model,
           'voice' => $voice,
           'speed' => $speed,
-          'response_format' => 'opus',
+          'format' => 'opus',
         ),
         'error' => null
       ),

@@ -65,7 +65,7 @@ $controller->fetchTtsParamsAction();
 $ttsOutput = ob_get_clean();
 $ttsData = json_decode($ttsOutput, true);
 $voice = $ttsData['response']['data']['voice'] ?? null;
-$format = $ttsData['response']['data']['response_format'] ?? null;
+$format = $ttsData['response']['data']['format'] ?? null;
 $speed = $ttsData['response']['data']['speed'] ?? null;
 
 if ($voice !== 'my-voice') {
