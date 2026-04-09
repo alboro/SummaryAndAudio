@@ -59,10 +59,8 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
 
         $prompt = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalize_prompt ?? ''));
         if ($this->isEmpty($prompt)) {
-            $prompt = 'Ты чтец. Преобразуй входящий текст для звукового воспроизведения: '
-                . 'убери или замени словами все форматирующие и специальные символы — '
-                . 'Markdown-разметку, HTML-теги, URL-адреса, математические и типографские символы. '
-                . 'Не добавляй объяснений — верни только преобразованный текст.';
+            // Fall back to the i18n-localized default prompt
+            $prompt = SummaryAndAudioExtension::t('tts_normalize_prompt');
         }
 
         return new LlmTextNormalizer(
@@ -313,7 +311,10 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         }
 
         $tts_model = trim((string)(FreshRSS_Context::$user_conf->oai_tts_model ?? 'tts-1'));
-        $voice     = trim((string)(FreshRSS_Context::$user_conf->oai_voice     ?? 'alloy'));
+        // Voice can be overridden per-request (e.g. different voice for result vs article)
+        $voiceParam   = trim((string)(Minz_Request::param('voice') ?? ''));
+        $voiceDefault = trim((string)(FreshRSS_Context::$user_conf->oai_voice ?? 'alloy'));
+        $voice        = ($voiceParam !== '') ? $voiceParam : $voiceDefault;
         $speed     = FreshRSS_Context::$user_conf->oai_speed;
         if ($speed === null || !is_numeric($speed)) {
             $speed = 1.1;

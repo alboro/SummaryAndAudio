@@ -15,6 +15,8 @@ class SummaryAndAudioExtension extends Minz_Extension
     Minz_View::appendStyle($this->getFileUrl('style.css', 'css'));
     Minz_View::appendScript($this->getFileUrl('axios.js', 'js'));
     Minz_View::appendScript($this->getFileUrl('marked.js', 'js'));
+    Minz_View::appendScript($this->getFileUrl('summary.js', 'js'));
+    Minz_View::appendScript($this->getFileUrl('tts.js', 'js'));
     Minz_View::appendScript($this->getFileUrl('script.js', 'js'));
   }
 
@@ -79,6 +81,15 @@ class SummaryAndAudioExtension extends Minz_Extension
     $attr_str .= ' data-speak-result="' . $url_tts . '"';
     $attr_str .= ' data-text-url="' . $url_text . '"';
     $attr_str .= ' data-entry-id="' . htmlspecialchars((string)$entry->id(), ENT_QUOTES) . '"';
+    // Per-context voice: voice for article TTS and voice_result for result TTS
+    $voice        = FreshRSS_Context::$user_conf->oai_voice        ?? '';
+    $voice_result = FreshRSS_Context::$user_conf->oai_voice_result ?? '';
+    if (trim((string)$voice) !== '') {
+      $attr_str .= ' data-voice="' . htmlspecialchars((string)$voice, ENT_QUOTES) . '"';
+    }
+    if (trim((string)$voice_result) !== '') {
+      $attr_str .= ' data-voice-result="' . htmlspecialchars((string)$voice_result, ENT_QUOTES) . '"';
+    }
 
     // Build summary buttons (one per configured button)
     $summary_buttons_html = '';

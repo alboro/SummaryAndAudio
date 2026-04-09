@@ -1,0 +1,41 @@
+<?php
+return [
+    'base_url'            => 'Bāzes URL (bez /v1)',
+    'api_key'             => 'API atslēga',
+    'model_name'          => 'Modeļa nosaukums',
+    'voice'               => 'Balss',
+    'speech_speed'        => 'Runas ātrums',
+    'tts_model'           => 'TTS modelis',
+    'tts_base_url'        => 'TTS URL (atstājiet tukšu — tiks izmantots pirmās pogas URL)',
+    'tts_api_key'         => 'TTS API atslēga (atstājiet tukšu — tiks izmantota pirmās pogas atslēga)',
+    'tts_url_placeholder' => 'piem. http://codex_openai_proxy:3001',
+    'tts_key_placeholder' => 'atstājiet tukšu, lai izmantotu pirmās pogas atslēgu',
+    'prompt'              => 'Sistēmas uzvedne',
+    'summary_buttons'     => 'Analīzes pogas',
+    'button'              => 'Poga',
+    'button_label'        => 'Pogas nosaukums',
+    'add_button'          => 'Pievienot pogu',
+    'remove'              => 'Noņemt',
+    'summary_settings'    => 'Analīzes iestatījumi',
+    'audio_settings'      => 'Skaņas iestatījumi',
+    'audio_url_hint'      => 'Atstājiet TTS URL/atslēgu tukšu, lai izmantotu pirmās pogas savienojumu.',
+    'save'                => 'Saglabāt',
+    'read'                => 'Nolasīt',
+    'pause'               => 'Pauze',
+    'read_paragraph'      => 'Nolasīt rindkopu',
+    'read_result'         => 'Nolasīt rezultātu',
+    'summarize'           => 'Kopsavilkums',
+    'longer_summary'      => 'Detalizētāk',
+    'preparing_request'   => 'Sagatavo pieprasījumu…',
+    'pending'             => 'Gaida atbildi…',
+    'receiving_answer'    => 'Saņem atbildi…',
+    'request_failed'      => 'Pieprasījuma kļūda',
+    'preparing_audio'     => 'Sagatavo audio…',
+    'audio_failed'        => 'Audio atskaņošanas kļūda',
+    'tts_normalize_prompt' => 'Tu esi lasītājs. Pārveido ienākošo tekstu audio atskaņošanai: '
+        . 'noņem vai aizstāj ar vārdiem visas formatēšanas un speciālās rakstzīmes — '
+        . 'Markdown iezīmēšanu, HTML tagus, URL adreses, matemātiskos un tipogrāfiskos simbolus, '
+        . 'emocijzīmes un jebkuras rakstzīmes, kas runas sintēzes laikā tiktu izrunātas burtiski. '
+        . 'Nepievieno paskaidrojumus vai komentārus — atgriez tikai pārveidoto tekstu.',
+];
+

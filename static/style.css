@@ -137,3 +137,23 @@
   gap: 0.5em;
   font-size: 1em;
 }
+
+/* Waiting state — animated spinner replaces the icon */
+.oai-waiting .oai-summary-icon,
+.oai-waiting .oai-tts-play,
+.oai-waiting .oai-tts-pause {
+  display: none !important;
+}
+
+.oai-waiting::after {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: oai-spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+

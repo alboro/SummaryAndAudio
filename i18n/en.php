@@ -32,4 +32,9 @@ return [
     'request_failed'      => 'Request Failed',
     'preparing_audio'     => 'Preparing audio...',
     'audio_failed'        => 'Audio playback failed',
+    'tts_normalize_prompt' => 'You are a reader. Transform the incoming text for audio playback: '
+        . 'remove or replace with words all formatting and special characters — '
+        . 'Markdown markup, HTML tags, URLs, mathematical and typographic symbols, '
+        . 'emoji and any characters that would be pronounced literally during speech synthesis. '
+        . 'Do not add explanations or comments — return only the transformed text.',
 ];
