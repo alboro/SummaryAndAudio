@@ -1,6 +1,6 @@
 # FreshRSS Article Summary Extension
 
-SummaryAndAudio is a fork of [LiangWei88/xExtension-ArticleSummary](https://github.com/LiangWei88/xExtension-ArticleSummary), updated to better integrate with FreshRSS and to leverage the latest OpenAI API models. In addition to the original summarization capabilities, this version allows users to generate two types of summaries: a concise short summary and a more detailed long summary.
+This is fork of [SummaryAndAudio](https://github.com/win-100/SummaryAndAudio) which is fork of [LiangWei88/xExtension-ArticleSummary](https://github.com/LiangWei88/xExtension-ArticleSummary), updated to better integrate with FreshRSS and to leverage the latest OpenAI API models. In addition to the original summarization capabilities, this version allows users to generate two types of summaries: a concise short summary and a more detailed long summary.
 
 ## Features
 - **Forked and Modernized**: Originates from the LiangWei88 project but refactored for smoother integration and maintenance within FreshRSS.
