@@ -58,7 +58,9 @@ class SummaryAndAudioExtension extends Minz_Extension
       . $icon_tts_play . $icon_tts_pause . '</button>';
     $article_content = preg_replace('/<p\b([^>]*)>/', '<p$1>' . $paragraph_button, $entry->content());
 
-    $attrs = [
+    // i18n strings go through htmlspecialchars; URL attrs are already HTML-encoded
+    // by Minz_Url::display() (which uses &amp; by default) — DO NOT double-encode them.
+    $i18n_attrs = [
       'data-read'              => self::t('read'),
       'data-pause'             => self::t('pause'),
       'data-preparing-request' => self::t('preparing_request'),
@@ -68,14 +70,15 @@ class SummaryAndAudioExtension extends Minz_Extension
       'data-receiving-answer'  => self::t('receiving_answer'),
       'data-request-failed'    => self::t('request_failed'),
       'data-read-result'       => self::t('read_result'),
-      'data-speak-result'      => $url_tts,
-      'data-entry-id'          => (string)$entry->id(),
-      'data-text-url'          => $url_text,
     ];
     $attr_str = '';
-    foreach ($attrs as $name => $value) {
+    foreach ($i18n_attrs as $name => $value) {
       $attr_str .= ' ' . $name . '="' . htmlspecialchars($value, ENT_QUOTES) . '"';
     }
+    // URLs: already HTML-encoded by Minz_Url::display(); entry id: numeric, safe as-is
+    $attr_str .= ' data-speak-result="' . $url_tts . '"';
+    $attr_str .= ' data-text-url="' . $url_text . '"';
+    $attr_str .= ' data-entry-id="' . htmlspecialchars((string)$entry->id(), ENT_QUOTES) . '"';
 
     // Build summary buttons (one per configured button)
     $summary_buttons_html = '';
