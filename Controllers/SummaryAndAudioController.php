@@ -11,6 +11,10 @@ foreach ([
     __DIR__ . '/../Services/OpenAiRequestDto.php',
     __DIR__ . '/../Services/OpenAiClientInterface.php',
     __DIR__ . '/../Services/HttpOpenAiClient.php',
+    __DIR__ . '/../Services/TextNormalizerInterface.php',
+    __DIR__ . '/../Services/SimpleTextNormalizer.php',
+    __DIR__ . '/../Services/LlmTextNormalizer.php',
+    __DIR__ . '/../Services/TtsService.php',
 ] as $_svc_file) {
     require_once $_svc_file;
 }
@@ -35,6 +39,47 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     protected function makeButtonConfigParser(): ButtonConfigParser
     {
         return new ButtonConfigParser();
+    }
+
+    protected function makeTtsNormalizer(): TextNormalizerInterface
+    {
+        $choice = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalizer ?? 'llm'));
+
+        if ($choice !== 'llm') {
+            return new SimpleTextNormalizer();
+        }
+
+        // LLM normalizer: reuse button[0]'s connection (same LLM as summarizer)
+        $buttons = $this->loadButtons();
+        $btn0    = $buttons[0] ?? null;
+
+        if ($btn0 === null || $this->isEmpty(trim($btn0->url)) || $this->isEmpty(trim($btn0->key))) {
+            return new SimpleTextNormalizer(); // graceful fallback
+        }
+
+        $prompt = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalize_prompt ?? ''));
+        if ($this->isEmpty($prompt)) {
+            $prompt = 'Ты чтец. Преобразуй входящий текст для звукового воспроизведения: '
+                . 'убери или замени словами все форматирующие и специальные символы — '
+                . 'Markdown-разметку, HTML-теги, URL-адреса, математические и типографские символы. '
+                . 'Не добавляй объяснений — верни только преобразованный текст.';
+        }
+
+        return new LlmTextNormalizer(
+            $this->makeOpenAiClient(),
+            trim($btn0->url),
+            trim($btn0->key),
+            trim($btn0->model),
+            $prompt
+        );
+    }
+
+    protected function makeTtsService(): TtsService
+    {
+        return new TtsService(
+            $this->makeOpenAiClient(),
+            $this->makeTtsNormalizer()
+        );
     }
 
     // ── Config helpers ──────────────────────────────────────────────────────
@@ -289,33 +334,21 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
             return;
         }
 
-        $tts_url = rtrim($tts_url, '/');
-        if (!preg_match('/\/v\d+\/?$/', $tts_url)) {
-            $tts_url .= '/v1';
-        }
+        $this->debugLog('speakAction: calling TtsService model=' . $tts_model . ' voice=' . $voice . ' content.len=' . strlen($content));
 
-        $this->debugLog('speakAction: calling ' . $tts_url . '/audio/speech model=' . $tts_model . ' voice=' . $voice . ' content.len=' . strlen($content));
-
-        $dto = new OpenAiRequestDto(
-            $tts_url . '/audio/speech',
-            $tts_key,
-            [
-                'model'  => $tts_model,
-                'voice'  => $voice,
-                'speed'  => $speed,
-                'input'  => $content,
-                'format' => $format,
-            ],
-            60
-        );
-
-        $client      = $this->makeOpenAiClient();
+        $ttsService  = $this->makeTtsService();
         $headersSent = false;
         $finalStatus = 0;
         $errorBody   = '';
 
-        $finalStatus = $client->stream(
-            $dto,
+        $finalStatus = $ttsService->speak(
+            $content,
+            $tts_url,
+            $tts_key,
+            $tts_model,
+            $voice,
+            $speed,
+            $format,
             function (string $data, int $status, string $contentType) use (&$headersSent, &$finalStatus, &$errorBody) {
                 $finalStatus = $status;
                 if (!$headersSent) {
@@ -338,7 +371,8 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
                 } else {
                     $errorBody .= $data;
                 }
-            }
+            },
+            60
         );
 
         $this->debugLog('speakAction: done finalStatus=' . $finalStatus . ' errorBody.len=' . strlen($errorBody));
