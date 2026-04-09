@@ -2,7 +2,7 @@
     "name": "alboro/summary-and-audio",
     "description": "FreshRSS extension – SummaryAndAudio fork (alboro)",
     "type": "library",
-    "license": "AGPL-3.0",
+    "license": "MIT",
     "require": {
         "php": ">=7.4"
     },
