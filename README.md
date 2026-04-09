@@ -19,7 +19,7 @@
 | 3 | TTS audio loaded via `<audio src="GET URL">` — broke with long content (URL length limits) and CSRF | Replaced with `fetch POST` → blob URL → `new Audio(blobUrl)` |
 | 4 | `media-src *` in CSP doesn't include `blob:` — audio playback blocked | Added `blob:` to `media-src` and `default-src` CSP policies |
 | 5 | Article-level "Read" button did nothing when article had no `<p>` tags | Falls back to reading the entire `.oai-summary-article` text as one TTS request |
-| 6 | `reasoning.effort: "minimal"` rejected by ChatGPT backend | Normalized to `"low"` in the codex proxy |
+| 6 | `reasoning.effort: "minimal"` rejected by backend | Normalized to `"low"` |
 
 ### Features added
 
@@ -35,12 +35,11 @@
 ### Prompt template example (`%rss_content%`)
 
 ```
-You are Karl Marx. Give a brief materialist commentary on this article.
+You are Friedrich Nietzsche, in your prime. Read the following news article and deliver
+a verdict — not an analysis, a verdict — on what it reveals about the modern slave morality,
+the herd instinct, or the rare signs of will to power, if any.
 
-Article:
 %rss_content%
-
-Commentary (2-3 paragraphs, in Russian):
 ```
 
 When `%rss_content%` is present in the prompt, the article text is embedded directly in the user message (no separate system role). When absent, the default behavior applies: prompt → system role, article → user role.

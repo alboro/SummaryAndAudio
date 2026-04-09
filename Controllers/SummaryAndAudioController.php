@@ -128,6 +128,19 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
       $oai_url .= '/v1';
     }
 
+    // Support %rss_content% placeholder: embed article content directly in prompt.
+    // Without placeholder: system = prompt, user = article. With placeholder: user = merged text.
+    if (strpos($oai_prompt, '%rss_content%') !== false) {
+      $inputMessages = [
+        ['role' => 'user', 'content' => str_replace('%rss_content%', $markdownContent, $oai_prompt)],
+      ];
+    } else {
+      $inputMessages = [
+        ['role' => 'system', 'content' => $oai_prompt],
+        ['role' => 'user',   'content' => "input: \n" . $markdownContent],
+      ];
+    }
+
     $payload = json_encode([
       'model'             => $oai_model,
       'input'             => $inputMessages,
@@ -240,21 +253,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     if (!preg_match('/\/v\d+\/?$/', $tts_url)) {
       $tts_url .= '/v1';
     }
-    $summaryUrl = $oai_url . '/responses';
-
-    // Support %rss_content% placeholder in prompt:
-    // If present, content is embedded directly in the user message (no separate system role).
-    // If absent, use default: system = prompt, user = article content.
-    if (strpos($oai_prompt, '%rss_content%') !== false) {
-      $inputMessages = [
-        ['role' => 'user', 'content' => str_replace('%rss_content%', $markdownContent, $oai_prompt)],
-      ];
-    } else {
-      $inputMessages = [
-        ['role' => 'system', 'content' => $oai_prompt],
-        ['role' => 'user',   'content' => "input: \n" . $markdownContent],
-      ];
-    }
+    $tts_endpoint = $tts_url . '/audio/speech';
 
     $payload = json_encode([
       'model'  => $tts_model,
