@@ -247,6 +247,9 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     public function speakAction()
     {
         $this->view->_layout(false);
+        // TTS can take 5-30 s per chunk; prevent PHP timeout from killing the request.
+        set_time_limit(120);
+        ignore_user_abort(true);
         $this->debugLog('speakAction called, content.len=' . strlen(trim((string)(Minz_Request::param('content') ?? ''))));
 
         // TTS connection: dedicated oai_tts_url/oai_tts_key, fallback to first button

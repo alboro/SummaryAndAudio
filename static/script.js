@@ -376,7 +376,8 @@ async function resultTtsButtonClick(target) {
   target._ttsStopped = false;
 
   try {
-    const chunks = splitTextForTts(text, 4000);
+    const chunks = splitTextForTts(text, 600);
+    console.log('[SAA] result TTS chunks=', chunks.length, 'first.len=', chunks[0] ? chunks[0].length : 0);
     target.disabled = false;
     await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t);
   } catch (err) {
@@ -506,7 +507,8 @@ async function ttsButtonClick(target, forceStop = false) {
           log.style.display = text ? 'none' : 'block';
           return;
         }
-        const chunks = splitTextForTts(text, 4000);
+        const chunks = splitTextForTts(text, 600);
+        console.log('[SAA] article TTS chunks=', chunks.length, 'first.len=', chunks[0].length);
         target.classList.add('oai-playing');
         target.setAttribute('aria-label', pauseLabel);
         target.setAttribute('title', pauseLabel);
