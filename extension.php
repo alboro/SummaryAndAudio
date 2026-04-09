@@ -81,7 +81,7 @@ class SummaryAndAudioExtension extends Minz_Extension
       $summary_buttons_html .= '<button data-request="' . $url_btn . '" data-btn="' . $idx . '" '
         . 'class="oai-summary-btn btn btn-small" '
         . 'aria-label="' . $label . '" title="' . $label . '">'
-        . $icon_summary . ' ' . $label
+        . $icon_summary
         . '</button>';
     }
 

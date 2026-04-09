@@ -17,7 +17,6 @@
 .oai-summary-box {
   display: none;
   background: var(--frss-background-color-dark);
-  color: var(--frss-font-color-light);
   border-radius: 8px;
   padding: 0.75em;
   margin-top: 1em;
@@ -28,16 +27,19 @@
 }
 
 
-
+.oai-summary-btn .oai-summary-icon {
   width: 1em;
   height: 1em;
-  color: var(--frss-font-color-light);
 }
 
 .oai-tts-btn .oai-tts-icon {
   width: 1em;
   height: 1em;
-  color: var(--frss-font-color-light);
+}
+
+/* Article-level TTS button (light background) — use normal text color */
+.oai-summary-wrap > .oai-tts-btn .oai-tts-icon {
+  color: var(--frss-font-color, currentColor);
 }
 
 .oai-tts-btn .oai-tts-pause {
