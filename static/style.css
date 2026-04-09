@@ -27,13 +27,8 @@
   display: block;
 }
 
-/* Hide only the top-level summarize button when the wrapper is active,
-   keeping nested buttons such as the “+” button visible. */
-.oai-summary-wrap.oai-summary-active > .oai-summary-btn {
-  display: none;
-}
 
-.oai-summary-btn .oai-summary-icon {
+
   width: 1em;
   height: 1em;
   color: var(--frss-font-color-light);
@@ -115,3 +110,26 @@
   cursor: pointer;
 }
 
+/* Result TTS button — appears inside .oai-summary-box after AI response */
+.oai-result-tts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  margin-top: 0.75em;
+}
+
+/* Config form — button slot container */
+.oai-btn-slot {
+  border: 1px solid var(--frss-border-color, #ccc);
+  border-radius: 6px;
+  padding: 0.75em;
+  margin-bottom: 1em;
+}
+
+.oai-btn-slot > h4 {
+  margin: 0 0 0.5em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1em;
+}

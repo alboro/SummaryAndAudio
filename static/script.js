@@ -28,10 +28,10 @@ function configureSummarizeButtons() {
 }
 
 function setOaiState(container, statusType, statusMsg, summaryText) {
-  const button = container.querySelector('.oai-summary-btn');
-  const moreButton = container.querySelector('.oai-summary-more');
+  const buttons = container.querySelectorAll('.oai-summary-btn');
   const content = container.querySelector('.oai-summary-content');
   const log = container.querySelector('.oai-summary-log');
+
   if (statusMsg !== null) {
     if (statusMsg === 'finish') {
       log.textContent = '';
@@ -41,37 +41,63 @@ function setOaiState(container, statusType, statusMsg, summaryText) {
       log.style.display = 'block';
     }
   }
+
   if (statusType === 1) {
     container.classList.add('oai-loading');
     container.classList.remove('oai-error');
-    button.disabled = true;
+    buttons.forEach(b => b.disabled = true);
     content.innerHTML = '';
-    if (moreButton) moreButton.style.display = 'none';
+    // Remove any previous result TTS button
+    const oldResultBtn = container.querySelector('.oai-result-tts-btn');
+    if (oldResultBtn) oldResultBtn.remove();
   } else if (statusType === 2) {
     container.classList.remove('oai-loading');
     container.classList.add('oai-error');
-    button.disabled = false;
+    buttons.forEach(b => b.disabled = false);
     content.innerHTML = '';
-    if (moreButton) moreButton.style.display = 'none';
   } else {
     container.classList.remove('oai-loading');
     container.classList.remove('oai-error');
     if (statusMsg === 'finish') {
-      button.disabled = false;
-      if (container.dataset.moreUsed) {
-        if (moreButton) {
-          moreButton.remove();
-        }
-        delete container.dataset.moreUsed;
-      } else if (moreButton) {
-        moreButton.style.display = 'inline-block';
-      }
+      buttons.forEach(b => b.disabled = false);
+      showResultTtsButton(container);
     }
   }
 
   if (summaryText) {
     content.innerHTML = summaryText;
   }
+}
+
+/**
+ * Inject a TTS play button inside .oai-summary-box after AI response completes.
+ */
+function showResultTtsButton(container) {
+  const speakUrl = container.dataset.speakResult;
+  if (!speakUrl) return;
+  const box = container.querySelector('.oai-summary-box');
+  if (!box) return;
+
+  // Remove existing result TTS button if any
+  const existing = box.querySelector('.oai-result-tts-btn');
+  if (existing) existing.remove();
+
+  // Clone play/pause icons from the article TTS button
+  const articleTtsBtn = container.querySelector('.oai-tts-btn:not(.oai-tts-paragraph):not(.oai-result-tts-btn)');
+  const playIcon  = articleTtsBtn ? articleTtsBtn.querySelector('.oai-tts-play')  : null;
+  const pauseIcon = articleTtsBtn ? articleTtsBtn.querySelector('.oai-tts-pause') : null;
+
+  const btn = document.createElement('button');
+  btn.className = 'oai-result-tts-btn oai-tts-btn btn btn-small';
+  btn.dataset.request = speakUrl;
+  const readResultLabel = container.dataset.readResult || container.dataset.read || 'Read result';
+  btn.setAttribute('aria-label', readResultLabel);
+  btn.setAttribute('title', readResultLabel);
+  if (playIcon)  btn.appendChild(playIcon.cloneNode(true));
+  if (pauseIcon) btn.appendChild(pauseIcon.cloneNode(true));
+  btn.appendChild(document.createTextNode(' ' + readResultLabel));
+
+  box.appendChild(btn);
 }
 
 async function summarizeButtonClick(target) {
@@ -81,12 +107,7 @@ async function summarizeButtonClick(target) {
     return;
   }
 
-  if (target.classList.contains('oai-summary-more')) {
-    container.dataset.moreUsed = '1';
-  }
-
   container.classList.add('oai-summary-active');
-
   setOaiState(container, 1, t.preparingRequest, null);
 
   var url = target.dataset.request;
@@ -107,16 +128,15 @@ async function summarizeButtonClick(target) {
       throw new Error(t.requestFailed + ' (1)');
     }
 
-    const provider = response.headers.get('X-Summary-Provider') || 'openai';
-    setOaiState(container, 1, provider === 'ollama' ? t.pendingOllama : t.pendingOpenai, null);
-    await streamSummary(container, response, provider);
+    setOaiState(container, 1, t.pending, null);
+    await streamSummary(container, response);
   } catch (error) {
     console.error(error);
     setOaiState(container, 2, t.requestFailed + ' (2)', null);
   }
 }
 
-async function streamSummary(container, response, provider) {
+async function streamSummary(container, response) {
   const t = container.dataset;
   try {
     setOaiState(container, 1, t.receivingAnswer, null);
@@ -124,75 +144,49 @@ async function streamSummary(container, response, provider) {
     const decoder = new TextDecoder('utf-8');
     let text = '';
     let buffer = '';
-    if (provider === 'ollama') {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          setOaiState(container, 0, 'finish', null);
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        let endIndex;
-        while ((endIndex = buffer.indexOf('\n')) !== -1) {
-          const jsonString = buffer.slice(0, endIndex).trim();
-          buffer = buffer.slice(endIndex + 1);
-          if (!jsonString) continue;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (buffer.trim()) {
           try {
-            const json = JSON.parse(jsonString);
-            if (json.response) {
-              text += json.response;
+            const json = JSON.parse(buffer.trim());
+            if (json.output_text) {
+              text += json.output_text;
               setOaiState(container, 0, null, marked.parse(text));
             }
           } catch (e) {
-            console.error('Error parsing JSON:', e, 'Chunk:', jsonString);
+            console.error('Error parsing final JSON:', e, 'Chunk:', buffer);
           }
         }
+        setOaiState(container, 0, 'finish', null);
+        break;
       }
-    } else {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (buffer.trim()) {
-            try {
-              const json = JSON.parse(buffer.trim());
-              if (json.output_text) {
-                text += json.output_text;
-                setOaiState(container, 0, null, marked.parse(text));
-              }
-            } catch (e) {
-              console.error('Error parsing final JSON:', e, 'Chunk:', buffer);
-              setOaiState(container, 2, t.requestFailed + ' (3)', null);
-            }
-          }
+      buffer += decoder.decode(value, { stream: true });
+      let parts = buffer.split(/\n\n/);
+      buffer = parts.pop();
+      for (let part of parts) {
+        const lines = part.trim().split('\n');
+        const dataLine = lines.find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+        let data = dataLine.slice(5).trim();
+        if (data === '[DONE]') {
           setOaiState(container, 0, 'finish', null);
-          break;
+          return;
         }
-        buffer += decoder.decode(value, { stream: true });
-        let parts = buffer.split(/\n\n/);
-        buffer = parts.pop();
-        for (let part of parts) {
-          const lines = part.trim().split('\n');
-          const dataLine = lines.find(l => l.startsWith('data:'));
-          if (!dataLine) continue;
-          let data = dataLine.slice(5).trim();
-          if (data === '[DONE]') {
+        try {
+          const json = JSON.parse(data);
+          if (json.type === 'response.completed') {
             setOaiState(container, 0, 'finish', null);
             return;
           }
-          try {
-            const json = JSON.parse(data);
-            if (json.type === 'response.completed') {
-              setOaiState(container, 0, 'finish', null);
-              return;
-            }
-            const delta = json.delta || json.output_text || '';
-            if (delta) {
-              text += delta;
-              setOaiState(container, 0, null, marked.parse(text));
-            }
-          } catch (e) {
-            console.error('Error parsing JSON:', e, 'Chunk:', data);
+          const delta = json.delta || json.output_text || '';
+          if (delta) {
+            text += delta;
+            setOaiState(container, 0, null, marked.parse(text));
           }
+        } catch (e) {
+          console.error('Error parsing JSON:', e, 'Chunk:', data);
         }
       }
     }
@@ -202,7 +196,110 @@ async function streamSummary(container, response, provider) {
   }
 }
 
+/**
+ * Handle TTS for the AI result (summary/translation text).
+ * Simple standalone play/pause — no paragraph sequence.
+ */
+async function resultTtsButtonClick(target) {
+  const container = target.closest('.oai-summary-wrap');
+  const log = container.querySelector('.oai-summary-log');
+  const t = container.dataset;
+  const readLabel  = t.readResult || t.read;
+  const pauseLabel = t.pause;
+
+  // Toggle existing audio
+  if (target._audio) {
+    if (target._audio.paused) {
+      try {
+        await target._audio.play();
+        target.classList.add('oai-playing');
+        target.setAttribute('aria-label', pauseLabel);
+        target.setAttribute('title', pauseLabel);
+        log.textContent = '';
+        log.style.display = 'none';
+      } catch (err) {
+        console.error('Playback failed', err);
+      }
+    } else {
+      target._audio.pause();
+      target.classList.remove('oai-playing');
+      target.setAttribute('aria-label', readLabel);
+      target.setAttribute('title', readLabel);
+    }
+    return;
+  }
+
+  // Get text from summary content
+  const contentEl = container.querySelector('.oai-summary-content');
+  const text = contentEl ? contentEl.textContent.trim() : '';
+  if (!text) return;
+
+  const url = target.dataset.request;
+  const form = new URLSearchParams();
+  form.append('ajax', 'true');
+  form.append('_csrf', context.csrf);
+  form.append('content', text);
+
+  const testAudio = document.createElement('audio');
+  let responseFormat = 'opus';
+  if (!testAudio.canPlayType('audio/ogg; codecs=opus')) {
+    if (testAudio.canPlayType('audio/mpeg')) {
+      responseFormat = 'mp3';
+    } else if (testAudio.canPlayType('audio/ogg')) {
+      responseFormat = 'ogg';
+    }
+  }
+  form.append('format', responseFormat);
+
+  target.disabled = true;
+  log.textContent = t.preparingAudio;
+  log.style.display = 'block';
+
+  try {
+    const audio = document.createElement('audio');
+    const qs = url.includes('?') ? '&' : '?';
+    audio.src = url + qs + form.toString();
+    audio.preload = 'auto';
+    audio.load();
+    audio.addEventListener('ended', () => {
+      target.classList.remove('oai-playing');
+      target.setAttribute('aria-label', readLabel);
+      target.setAttribute('title', readLabel);
+      log.textContent = '';
+      log.style.display = 'none';
+    });
+    audio.addEventListener('error', () => {
+      log.textContent = t.audioFailed;
+      log.style.display = 'block';
+      target.classList.remove('oai-playing');
+      target.setAttribute('aria-label', readLabel);
+      target.setAttribute('title', readLabel);
+      target._audio = null;
+    }, { once: true });
+    target._audio = audio;
+
+    await audio.play();
+    target.classList.add('oai-playing');
+    target.setAttribute('aria-label', pauseLabel);
+    target.setAttribute('title', pauseLabel);
+    log.textContent = '';
+    log.style.display = 'none';
+  } catch (err) {
+    console.error(err);
+    log.textContent = t.audioFailed;
+    log.style.display = 'block';
+    target._audio = null;
+  } finally {
+    target.disabled = false;
+  }
+}
+
 async function ttsButtonClick(target, forceStop = false, preload = false) {
+  // Result TTS button: special handling — reads .oai-summary-content text
+  if (target.classList.contains('oai-result-tts-btn')) {
+    return await resultTtsButtonClick(target);
+  }
+
   const container = target.closest('.oai-summary-wrap');
   const log = container.querySelector('.oai-summary-log');
   const t = container.dataset;
@@ -210,7 +307,6 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   const pauseLabel = t.pause;
   const msgPrepAudio = t.preparingAudio;
   const msgAudioFailed = t.audioFailed;
-  const msgRequestFailed = t.requestFailed;
 
   const maybePreloadNext = (btn) => {
     const parent = btn._sequenceParent;
@@ -270,7 +366,7 @@ async function ttsButtonClick(target, forceStop = false, preload = false) {
   }
 
   // Paragraph button: start sequence from this paragraph
-  const articleBtn = container.querySelector('.oai-tts-btn:not(.oai-tts-paragraph)');
+  const articleBtn = container.querySelector('.oai-tts-btn:not(.oai-tts-paragraph):not(.oai-result-tts-btn)');
   if (articleBtn && !target._sequenceParent && !preload) {
     if (
       articleBtn._sequence &&

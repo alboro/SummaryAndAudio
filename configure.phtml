@@ -1,48 +1,135 @@
 <?php
-$oai_url   = FreshRSS_Context::$user_conf->oai_url   ?: 'https://api.openai.com';
-$oai_key = FreshRSS_Context::$user_conf->oai_key;
-$oai_model = FreshRSS_Context::$user_conf->oai_model ?: 'gpt-5-nano';
-$oai_tts_model = FreshRSS_Context::$user_conf->oai_tts_model ?: 'gpt-tts-1';
-$oai_voice = FreshRSS_Context::$user_conf->oai_voice ?: 'alloy';
-$oai_speed = FreshRSS_Context::$user_conf->oai_speed ?: 1.1;
-$oai_prompt = FreshRSS_Context::$user_conf->oai_prompt;
-$oai_prompt_2 = FreshRSS_Context::$user_conf->oai_prompt_2;
-$oai_provider = FreshRSS_Context::$user_conf->oai_provider ?: 'openai'; // Default to OpenAI
+$buttons_json = FreshRSS_Context::$user_conf->oai_buttons;
+$buttons = $buttons_json ? json_decode((string)$buttons_json, true) : null;
+if (empty($buttons) || !is_array($buttons)) {
+  // Legacy fallback: migrate old flat config
+  $legacy_url   = FreshRSS_Context::$user_conf->oai_url   ?: '';
+  $legacy_key   = FreshRSS_Context::$user_conf->oai_key   ?: '';
+  $legacy_model = FreshRSS_Context::$user_conf->oai_model ?: '';
+  $legacy_p1    = FreshRSS_Context::$user_conf->oai_prompt ?: '';
+  $legacy_p2    = FreshRSS_Context::$user_conf->oai_prompt_2 ?: '';
+  $buttons = [];
+  if ($legacy_p1) {
+    $buttons[] = ['label' => 'Summarize', 'url' => $legacy_url, 'key' => $legacy_key, 'model' => $legacy_model, 'prompt' => $legacy_p1];
+  }
+  if ($legacy_p2) {
+    $buttons[] = ['label' => '+', 'url' => $legacy_url, 'key' => $legacy_key, 'model' => $legacy_model, 'prompt' => $legacy_p2];
+  }
+}
+$oai_tts_url   = FreshRSS_Context::$user_conf->oai_tts_url   ?: '';
+$oai_tts_key   = FreshRSS_Context::$user_conf->oai_tts_key   ?: '';
+$oai_tts_model = FreshRSS_Context::$user_conf->oai_tts_model ?: 'tts-1';
+$oai_voice     = FreshRSS_Context::$user_conf->oai_voice     ?: 'alloy';
+$oai_speed     = FreshRSS_Context::$user_conf->oai_speed     ?: 1.1;
 ?>
 
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
 
   <fieldset>
-    <legend><?php echo SummaryAndAudioExtension::t('summary_settings'); ?></legend>
-    <label for="oai_provider"><?php echo SummaryAndAudioExtension::t('choose_provider'); ?></label>
-    <select name="oai_provider">
-      <option value="openai" <?php echo ($oai_provider == 'openai' ? 'selected' : ''); ?>><?php echo SummaryAndAudioExtension::t('openai'); ?></option>
-      <option value="ollama" <?php echo ($oai_provider == 'ollama' ? 'selected' : ''); ?>><?php echo SummaryAndAudioExtension::t('ollama'); ?></option>
-    </select>
-    <label for="oai_url"><?php echo SummaryAndAudioExtension::t('base_url'); ?></label>
-    <input type="text" name="oai_url" id="oai_url" value="<?php echo $oai_url; ?>">
-    <label for="oai_key"><?php echo SummaryAndAudioExtension::t('api_key'); ?></label>
-    <input type="text" name="oai_key" id="oai_key" value="<?php echo $oai_key; ?>">
-    <label for="oai_model"><?php echo SummaryAndAudioExtension::t('model_name'); ?></label>
-    <input type="text" name="oai_model" id="oai_model" value="<?php echo $oai_model; ?>">
-    <label for="oai_prompt"><?php echo SummaryAndAudioExtension::t('prompt'); ?></label>
-    <textarea name="oai_prompt" id="oai_prompt"><?php echo $oai_prompt; ?></textarea>
-    <label for="oai_prompt_2"><?php echo SummaryAndAudioExtension::t('prompt_2'); ?></label>
-    <textarea name="oai_prompt_2" id="oai_prompt_2"><?php echo $oai_prompt_2; ?></textarea>
+    <legend><?php echo SummaryAndAudioExtension::t('summary_buttons'); ?></legend>
+    <div id="oai-buttons-container">
+      <?php foreach ($buttons as $idx => $btn): ?>
+      <div class="oai-btn-slot">
+        <h4><?php echo SummaryAndAudioExtension::t('button'); ?> <?php echo $idx + 1; ?>
+          <button type="button" class="oai-remove-slot btn btn-small"><?php echo SummaryAndAudioExtension::t('remove'); ?></button>
+        </h4>
+        <label><?php echo SummaryAndAudioExtension::t('button_label'); ?>
+          <input type="text" name="oai_btn[<?php echo $idx; ?>][label]" value="<?php echo htmlspecialchars((string)($btn['label'] ?? ''), ENT_QUOTES); ?>">
+        </label>
+        <label><?php echo SummaryAndAudioExtension::t('base_url'); ?>
+          <input type="text" name="oai_btn[<?php echo $idx; ?>][url]" value="<?php echo htmlspecialchars((string)($btn['url'] ?? ''), ENT_QUOTES); ?>">
+        </label>
+        <label><?php echo SummaryAndAudioExtension::t('api_key'); ?>
+          <input type="text" name="oai_btn[<?php echo $idx; ?>][key]" value="<?php echo htmlspecialchars((string)($btn['key'] ?? ''), ENT_QUOTES); ?>">
+        </label>
+        <label><?php echo SummaryAndAudioExtension::t('model_name'); ?>
+          <input type="text" name="oai_btn[<?php echo $idx; ?>][model]" value="<?php echo htmlspecialchars((string)($btn['model'] ?? ''), ENT_QUOTES); ?>">
+        </label>
+        <label><?php echo SummaryAndAudioExtension::t('prompt'); ?>
+          <textarea name="oai_btn[<?php echo $idx; ?>][prompt]"><?php echo htmlspecialchars((string)($btn['prompt'] ?? ''), ENT_QUOTES); ?></textarea>
+        </label>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <button type="button" id="oai-add-btn" class="btn btn-small">+ <?php echo SummaryAndAudioExtension::t('add_button'); ?></button>
   </fieldset>
 
   <fieldset>
     <legend><?php echo SummaryAndAudioExtension::t('audio_settings'); ?></legend>
-    <p><?php echo SummaryAndAudioExtension::t('audio_openai_only'); ?></p>
+    <p><?php echo SummaryAndAudioExtension::t('audio_url_hint'); ?></p>
+    <label for="oai_tts_url"><?php echo SummaryAndAudioExtension::t('tts_base_url'); ?></label>
+    <input type="text" name="oai_tts_url" id="oai_tts_url"
+           value="<?php echo htmlspecialchars($oai_tts_url, ENT_QUOTES); ?>"
+           placeholder="<?php echo SummaryAndAudioExtension::t('tts_url_placeholder'); ?>">
+    <label for="oai_tts_key"><?php echo SummaryAndAudioExtension::t('tts_api_key'); ?></label>
+    <input type="text" name="oai_tts_key" id="oai_tts_key"
+           value="<?php echo htmlspecialchars($oai_tts_key, ENT_QUOTES); ?>"
+           placeholder="<?php echo SummaryAndAudioExtension::t('tts_key_placeholder'); ?>">
+    <label for="oai_tts_model"><?php echo SummaryAndAudioExtension::t('tts_model'); ?></label>
+    <input type="text" name="oai_tts_model" id="oai_tts_model" value="<?php echo htmlspecialchars($oai_tts_model, ENT_QUOTES); ?>">
     <label for="oai_voice"><?php echo SummaryAndAudioExtension::t('voice'); ?></label>
-    <input type="text" name="oai_voice" id="oai_voice" value="<?php echo $oai_voice; ?>">
+    <input type="text" name="oai_voice" id="oai_voice" value="<?php echo htmlspecialchars($oai_voice, ENT_QUOTES); ?>">
     <label for="oai_speed"><?php echo SummaryAndAudioExtension::t('speech_speed'); ?></label>
     <input type="number" name="oai_speed" id="oai_speed" min="0.5" max="4" step="0.1" value="<?php echo $oai_speed; ?>">
-    <label for="oai_tts_model"><?php echo SummaryAndAudioExtension::t('tts_model'); ?></label>
-    <input type="text" name="oai_tts_model" id="oai_tts_model" value="<?php echo $oai_tts_model; ?>">
   </fieldset>
 
   <hr />
   <button type="submit"><?php echo SummaryAndAudioExtension::t('save'); ?></button>
 </form>
+
+<script>
+(function () {
+  var container = document.getElementById('oai-buttons-container');
+  var addBtn    = document.getElementById('oai-add-btn');
+  var btnLabel  = <?php echo json_encode(SummaryAndAudioExtension::t('button')); ?>;
+  var removeLabel = <?php echo json_encode(SummaryAndAudioExtension::t('remove')); ?>;
+  var labels = {
+    button_label: <?php echo json_encode(SummaryAndAudioExtension::t('button_label')); ?>,
+    base_url:     <?php echo json_encode(SummaryAndAudioExtension::t('base_url')); ?>,
+    api_key:      <?php echo json_encode(SummaryAndAudioExtension::t('api_key')); ?>,
+    model_name:   <?php echo json_encode(SummaryAndAudioExtension::t('model_name')); ?>,
+    prompt:       <?php echo json_encode(SummaryAndAudioExtension::t('prompt')); ?>
+  };
+
+  function reindex() {
+    var slots = container.querySelectorAll('.oai-btn-slot');
+    slots.forEach(function (slot, i) {
+      slot.querySelectorAll('input, textarea').forEach(function (el) {
+        el.name = el.name.replace(/oai_btn\[\d+\]/, 'oai_btn[' + i + ']');
+      });
+      var h4 = slot.querySelector('h4');
+      if (h4) h4.firstChild.textContent = btnLabel + ' ' + (i + 1) + ' ';
+    });
+  }
+
+  container.addEventListener('click', function (e) {
+    if (e.target.classList.contains('oai-remove-slot')) {
+      var slot = e.target.closest('.oai-btn-slot');
+      if (slot) { slot.remove(); reindex(); }
+    }
+  });
+
+  addBtn.addEventListener('click', function () {
+    var slots  = container.querySelectorAll('.oai-btn-slot');
+    var idx    = slots.length;
+    var first  = slots[0];
+    var defUrl   = first ? (first.querySelector('input[name*="[url]"]')   || {}).value || '' : '';
+    var defKey   = first ? (first.querySelector('input[name*="[key]"]')   || {}).value || '' : '';
+    var defModel = first ? (first.querySelector('input[name*="[model]"]') || {}).value || '' : '';
+
+    var slot = document.createElement('div');
+    slot.className = 'oai-btn-slot';
+    slot.innerHTML =
+      '<h4>' + btnLabel + ' ' + (idx + 1) + ' ' +
+        '<button type="button" class="oai-remove-slot btn btn-small">' + removeLabel + '</button></h4>' +
+      '<label>' + labels.button_label + '<input type="text" name="oai_btn[' + idx + '][label]" value=""></label>' +
+      '<label>' + labels.base_url   + '<input type="text" name="oai_btn[' + idx + '][url]"   value="' + defUrl   + '"></label>' +
+      '<label>' + labels.api_key    + '<input type="text" name="oai_btn[' + idx + '][key]"   value="' + defKey   + '"></label>' +
+      '<label>' + labels.model_name + '<input type="text" name="oai_btn[' + idx + '][model]" value="' + defModel + '"></label>' +
+      '<label>' + labels.prompt     + '<textarea name="oai_btn[' + idx + '][prompt]"></textarea></label>';
+    container.appendChild(slot);
+  });
+})();
+</script>
+
