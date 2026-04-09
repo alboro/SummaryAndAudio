@@ -4,7 +4,8 @@ class SummaryAndAudioExtension extends Minz_Extension
   private static ?array $i18n = null;
 
   protected array $csp_policies = [
-    'default-src' => '*',
+    'default-src' => "'self' blob: *",
+    'media-src'   => "'self' blob: *",
   ];
 
   public function init()

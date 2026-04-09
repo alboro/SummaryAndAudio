@@ -130,10 +130,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
 
     $payload = json_encode([
       'model'             => $oai_model,
-      'input'             => [
-        ['role' => 'system', 'content' => $oai_prompt],
-        ['role' => 'user',   'content' => "input: \n" . $markdownContent],
-      ],
+      'input'             => $inputMessages,
       'reasoning'         => ['effort' => 'low'],
       'max_output_tokens' => 2048,
       'temperature'       => 1,
@@ -243,7 +240,21 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
     if (!preg_match('/\/v\d+\/?$/', $tts_url)) {
       $tts_url .= '/v1';
     }
-    $tts_endpoint = $tts_url . '/audio/speech';
+    $summaryUrl = $oai_url . '/responses';
+
+    // Support %rss_content% placeholder in prompt:
+    // If present, content is embedded directly in the user message (no separate system role).
+    // If absent, use default: system = prompt, user = article content.
+    if (strpos($oai_prompt, '%rss_content%') !== false) {
+      $inputMessages = [
+        ['role' => 'user', 'content' => str_replace('%rss_content%', $markdownContent, $oai_prompt)],
+      ];
+    } else {
+      $inputMessages = [
+        ['role' => 'system', 'content' => $oai_prompt],
+        ['role' => 'user',   'content' => "input: \n" . $markdownContent],
+      ];
+    }
 
     $payload = json_encode([
       'model'  => $tts_model,

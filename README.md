@@ -1,70 +1,50 @@
-# FreshRSS Article Summary Extension
+# SummaryAndAudio — alboro fork
 
-This is fork of [SummaryAndAudio](https://github.com/win-100/SummaryAndAudio) which is fork of [LiangWei88/xExtension-ArticleSummary](https://github.com/LiangWei88/xExtension-ArticleSummary), updated to better integrate with FreshRSS and to leverage the latest OpenAI API models. In addition to the original summarization capabilities, this version allows users to generate two types of summaries: a concise short summary and a more detailed long summary.
-
-## Features
-- **Forked and Modernized**: Originates from the LiangWei88 project but refactored for smoother integration and maintenance within FreshRSS.
-- **Latest OpenAI Model**: Uses the most recent OpenAI model by default for higher quality summaries.
-- **Two Summary Lengths**: Users can request either a short summary for quick insight or a long summary for deeper understanding.
-- **API Configuration**: Configure the base URL, API key, model name, and prompt through a simple form.
-- **Summarize Button**: Adds a "summarize" button to each article, allowing users to generate a summary with a single click.
-- **Markdown Support**: Converts HTML content to Markdown before sending it to the API.
-- **Text-to-Speech**: Listen to articles using OpenAI's TTS with adjustable reading speed. Audio playback always uses OpenAI regardless of the summary provider.
-- **Error Handling**: Provides feedback in case of API errors or incomplete configurations.
-- **Smart Fallback**: Uses the article's description if the main content is empty or contains only images.
-
-## Installation
-
-1. **Download the Extension**: Clone or download this repository to your FreshRSS extensions directory.
-2. **Enable the Extension**: Go to the FreshRSS extensions management page and enable the "SummaryAndAudio" extension.
-3. **Configure the Extension**: Navigate to the extension's configuration page to set up your API details.
-
-## Configuration
-
-### Summary
-These settings control how article summaries are generated. You may choose the provider for text summarisation and supply separate prompts for the two available levels of detail.
-
-1. **Provider**: Select the service used to generate summaries ("OpenAI" or "Ollama").
-2. **Base URL**: Enter the base URL of your language model API (e.g., `https://api.openai.com/`). Do not include the version path (e.g., `/v1`).
-3. **API Key**: Provide your API key for authentication.
-4. **Model Name**: Specify the model name you wish to use for summarisation (e.g., `gpt-4.1`).
-5. **Prompt (High-Level)**: Prompt used to produce a concise, high-level summary.
-6. **Second Prompt (Detailed)**: Prompt used when requesting an additional, more detailed summary.
-
-### Audio (OpenAI only)
-Audio playback always uses the OpenAI Text-to-Speech API, regardless of the provider selected for summaries.
-
-1. **Voice & TTS Model**: Choose the OpenAI voice and TTS model used for audio playback.
-2. **Reading Speed**: Set the playback speed between `0.5` and `4` (default `1.1`).
-
-## Usage
-
-Once configured, the extension will automatically add a "summarize" button to each article. Clicking the button will:
-
-1. Send the article content to the configured API.
-2. Display both the short and long summaries below the button.
-
-## Dependencies
-
-- **Axios**: Used for making HTTP requests from the browser.
-- **Marked**: Converts Markdown content to HTML for display.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Original project by [LiangWei88](https://github.com/LiangWei88/xExtension-ArticleSummary).
-- Thanks to the FreshRSS community for providing a robust platform for RSS management.
-
-## History
-- Version: 0.1.1 (2024-11-20)
-  > **Bug Fix**: Prevented the summary button from affecting the title list display. Previously, the `entry_before_display` hook was causing the summary button to appear in the title list, leading to display issues. Now, the button initially has no text and adds text only when the article is displayed.
+> This is a fork of [win-100/SummaryAndAudio](https://github.com/win-100/SummaryAndAudio) — a FreshRSS extension that summarizes and reads articles aloud using OpenAI-compatible APIs.  
+> Original README and documentation: see the upstream repository.
 
 ---
-For any questions or support, please open an issue on this repository.
+
+## This fork
+
+**Vibe-coded with AI assistance. Use at your own risk. No guarantees of correctness, security, or sanity.**  
+*Плод безответственного вайб-кодинга.*
+
+### Bugs fixed
+
+| # | Problem | Fix |
+|---|---------|-----|
+| 1 | `fetchTtsParamsAction()` leaked the API key to the browser (returned `oai_key` in JSON) | Endpoint now returns **403 Forbidden** |
+| 2 | SSE streaming didn't stream — text appeared all at once | Apache `mod_deflate` was buffering chunks for gzip. Fixed with `apache_setenv('no-gzip', '1')` + clearing all PHP output buffers before the first SSE chunk |
+| 3 | TTS audio loaded via `<audio src="GET URL">` — broke with long content (URL length limits) and CSRF | Replaced with `fetch POST` → blob URL → `new Audio(blobUrl)` |
+| 4 | `media-src *` in CSP doesn't include `blob:` — audio playback blocked | Added `blob:` to `media-src` and `default-src` CSP policies |
+| 5 | Article-level "Read" button did nothing when article had no `<p>` tags | Falls back to reading the entire `.oai-summary-article` text as one TTS request |
+| 6 | `reasoning.effort: "minimal"` rejected by ChatGPT backend | Normalized to `"low"` in the codex proxy |
+
+### Features added
+
+| Feature | Description |
+|---------|-------------|
+| **Configurable buttons** | Each button has its own `label`, `url`, `key`, `model`, and `prompt`. Number of buttons is set in extension config (add/remove via UI). Stored as JSON in `oai_buttons` user config key. |
+| **Auto-fetch full article** | If RSS entry content is < 200 chars, the extension fetches the article URL and passes the full page text to the AI. |
+| **TTS for AI result** | After summary/translation completes, a play button appears inside the result box. Reads the AI-generated text aloud. |
+| **`%rss_content%` in prompts** | Use `%rss_content%` anywhere in a prompt template — it's replaced with the article's Markdown text before sending to the AI. Enables fully custom prompt construction without a fixed "system + user" split. |
+| **Removed Ollama/OpenAI provider split** | All requests use the OpenAI Responses API (`/v1/responses`). Any OpenAI-compatible backend works. Provider config is just the button's URL + key. |
+| **Backward-compatible** | Falls back to the old flat config keys (`oai_url`, `oai_key`, `oai_model`, `oai_prompt`, `oai_prompt_2`) if `oai_buttons` is not set. |
+
+### Prompt template example (`%rss_content%`)
+
+```
+You are Karl Marx. Give a brief materialist commentary on this article.
+
+Article:
+%rss_content%
+
+Commentary (2-3 paragraphs, in Russian):
+```
+
+When `%rss_content%` is present in the prompt, the article text is embedded directly in the user message (no separate system role). When absent, the default behavior applies: prompt → system role, article → user role.
+
+---
+
+*Fork maintained for personal use. PRs welcome but not expected.*
