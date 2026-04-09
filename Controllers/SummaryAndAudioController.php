@@ -83,6 +83,12 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         return $item === null || (is_string($item) && trim($item) === '');
     }
 
+    private function debugLog(string $msg): void
+    {
+        $line = date('Y-m-d H:i:s') . ' ' . $msg . "\n";
+        file_put_contents('/tmp/saa_debug.log', $line, FILE_APPEND | LOCK_EX);
+    }
+
     // ── Entry helpers ───────────────────────────────────────────────────────
 
     /**
@@ -225,19 +231,23 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         header('Content-Type: application/json');
 
         $entry_id        = Minz_Request::param('id');
+        $this->debugLog('getArticleTextAction called, entry_id=' . var_export($entry_id, true));
         $markdownContent = $this->getEntryMarkdown($entry_id);
 
         if ($markdownContent === null) {
+            $this->debugLog('getArticleTextAction: entry not found');
             echo json_encode(['error' => 'Not found', 'status' => 404]);
             return;
         }
 
+        $this->debugLog('getArticleTextAction: text.length=' . strlen($markdownContent));
         echo json_encode(['text' => $markdownContent, 'status' => 200]);
     }
 
     public function speakAction()
     {
         $this->view->_layout(false);
+        $this->debugLog('speakAction called, content.len=' . strlen(trim((string)(Minz_Request::param('content') ?? ''))));
 
         // TTS connection: dedicated oai_tts_url/oai_tts_key, fallback to first button
         $tts_url = trim((string)(FreshRSS_Context::$user_conf->oai_tts_url ?? ''));
@@ -266,6 +276,11 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         $format  = in_array($format, ['mp3', 'ogg', 'opus']) ? $format : 'opus';
 
         if ($this->isEmpty($tts_url) || $this->isEmpty($tts_key) || $this->isEmpty($tts_model) || $this->isEmpty($voice) || $this->isEmpty($content)) {
+            $this->debugLog('speakAction: missing config — tts_url=' . var_export($tts_url, true)
+                . ' tts_key=' . (empty($tts_key) ? 'EMPTY' : 'SET')
+                . ' tts_model=' . var_export($tts_model, true)
+                . ' voice=' . var_export($voice, true)
+                . ' content.len=' . strlen($content));
             header('Content-Type: application/json');
             echo json_encode(['response' => ['data' => 'missing config', 'error' => 'configuration'], 'status' => 200]);
             return;
@@ -275,6 +290,8 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         if (!preg_match('/\/v\d+\/?$/', $tts_url)) {
             $tts_url .= '/v1';
         }
+
+        $this->debugLog('speakAction: calling ' . $tts_url . '/audio/speech model=' . $tts_model . ' voice=' . $voice . ' content.len=' . strlen($content));
 
         $dto = new OpenAiRequestDto(
             $tts_url . '/audio/speech',
@@ -310,6 +327,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
                         header('Content-Type: application/json', true, $status ?: 500);
                     }
                     $headersSent = true;
+                    $this->debugLog('speakAction: first chunk status=' . $status . ' content-type=' . $contentType);
                 }
                 if ($status >= 200 && $status < 300) {
                     echo $data;
@@ -319,6 +337,8 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
                 }
             }
         );
+
+        $this->debugLog('speakAction: done finalStatus=' . $finalStatus . ' errorBody.len=' . strlen($errorBody));
 
         if ($finalStatus < 200 || $finalStatus >= 300) {
             if (!$headersSent) {

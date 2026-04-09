@@ -173,6 +173,7 @@ async function streamSummary(container, response) {
  * Returns empty string on failure.
  */
 async function getArticleText(textUrl) {
+  console.log('[SAA] getArticleText url=', textUrl);
   try {
     const form = new URLSearchParams();
     form.append('ajax', 'true');
@@ -182,11 +183,17 @@ async function getArticleText(textUrl) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form
     });
-    if (!resp.ok) return '';
+    console.log('[SAA] getArticleText resp.status=', resp.status, 'ok=', resp.ok);
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      console.error('[SAA] getArticleText error body:', body);
+      return '';
+    }
     const json = await resp.json();
+    console.log('[SAA] getArticleText text.length=', (json.text || '').length);
     return (typeof json.text === 'string') ? json.text : '';
   } catch (e) {
-    console.error('getArticleText failed', e);
+    console.error('[SAA] getArticleText failed', e);
     return '';
   }
 }
@@ -216,6 +223,7 @@ function splitTextForTts(text, maxChars) {
  * Fetch TTS audio from server via POST, return Audio element backed by blob URL.
  */
 async function ttsLoadAudio(url, text) {
+  console.log('[SAA] ttsLoadAudio url=', url, 'text.length=', text.length, 'text[0:80]=', text.substring(0, 80));
   const form = new URLSearchParams();
   form.append('ajax', 'true');
   form.append('_csrf', context.csrf);
@@ -227,15 +235,22 @@ async function ttsLoadAudio(url, text) {
     fmt = testEl.canPlayType('audio/mpeg') ? 'mp3' : 'ogg';
   }
   form.append('format', fmt);
+  console.log('[SAA] ttsLoadAudio format=', fmt);
 
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form
   });
-  if (!resp.ok) throw new Error('TTS: HTTP ' + resp.status);
+  console.log('[SAA] ttsLoadAudio resp.status=', resp.status, 'content-type=', resp.headers.get('content-type'));
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    console.error('[SAA] ttsLoadAudio error body:', body);
+    throw new Error('TTS: HTTP ' + resp.status);
+  }
 
   const blob = await resp.blob();
+  console.log('[SAA] ttsLoadAudio blob.size=', blob.size, 'blob.type=', blob.type);
   const blobUrl = URL.createObjectURL(blob);
   const audio = new Audio(blobUrl);
   audio._blobUrl = blobUrl;
@@ -302,6 +317,7 @@ async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, lo
 }
 
 async function resultTtsButtonClick(target) {
+  console.log('[SAA] resultTtsButtonClick data-request=', target.dataset.request);
   const container = target.closest('.oai-summary-wrap');
   const log = container.querySelector('.oai-summary-log');
   const t = container.dataset;
@@ -344,6 +360,7 @@ async function resultTtsButtonClick(target) {
   // Read the summary content text
   const contentEl = container.querySelector('.oai-summary-content');
   const text = contentEl ? contentEl.textContent.trim() : '';
+  console.log('[SAA] resultTtsButtonClick text.length=', text.length, 'text[0:80]=', text.substring(0, 80));
 
   // Show feedback even if text is empty so user knows the click registered
   log.textContent = t.preparingAudio || 'Preparing audio...';
@@ -373,6 +390,7 @@ async function resultTtsButtonClick(target) {
 }
 
 async function ttsButtonClick(target, forceStop = false) {
+  console.log('[SAA] ttsButtonClick classes=', target.className, 'data-request=', target.dataset.request);
   if (target.classList.contains('oai-result-tts-btn')) {
     return await resultTtsButtonClick(target);
   }
@@ -382,6 +400,7 @@ async function ttsButtonClick(target, forceStop = false) {
   const t = container.dataset;
   const readLabel  = t.read || 'Read';
   const pauseLabel = t.pause || 'Pause';
+  console.log('[SAA] ttsButtonClick container.dataset.textUrl=', container.dataset.textUrl, 'speakResult=', container.dataset.speakResult);
 
   // Toggle / stop existing audio
   if (target._audio) {
