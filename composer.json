@@ -1,0 +1,26 @@
+{
+    "name": "alboro/summary-and-audio",
+    "description": "FreshRSS extension – SummaryAndAudio fork (alboro)",
+    "type": "library",
+    "license": "AGPL-3.0",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.0"
+    },
+    "autoload": {
+        "classmap": [
+            "Services/"
+        ]
+    },
+    "autoload-dev": {
+        "classmap": [
+            "tests/"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
+

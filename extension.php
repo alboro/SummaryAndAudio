@@ -44,6 +44,11 @@ class SummaryAndAudioExtension extends Minz_Extension
     }
 
     $url_tts        = Minz_Url::display(['c' => 'SummaryAndAudio', 'a' => 'speak']);
+    $url_text       = Minz_Url::display([
+      'c'      => 'SummaryAndAudio',
+      'a'      => 'getArticleText',
+      'params' => ['id' => $entry->id()],
+    ]);
     $icon_tts_play  = str_replace('<svg ', '<svg class="oai-tts-icon oai-tts-play" ',  file_get_contents(__DIR__ . '/static/img/play.svg'));
     $icon_tts_pause = str_replace('<svg ', '<svg class="oai-tts-icon oai-tts-pause" ', file_get_contents(__DIR__ . '/static/img/pause.svg'));
     $icon_summary   = str_replace('<svg ', '<svg class="oai-summary-icon" ',           file_get_contents(__DIR__ . '/static/img/summary.svg'));
@@ -64,6 +69,8 @@ class SummaryAndAudioExtension extends Minz_Extension
       'data-request-failed'    => self::t('request_failed'),
       'data-read-result'       => self::t('read_result'),
       'data-speak-result'      => $url_tts,
+      'data-entry-id'          => (string)$entry->id(),
+      'data-text-url'          => $url_text,
     ];
     $attr_str = '';
     foreach ($attrs as $name => $value) {

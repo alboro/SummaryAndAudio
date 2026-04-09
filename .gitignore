@@ -1,1 +1,4 @@
 *Zone.Identifier
+vendor/
+.phpunit.cache/
+composer.lock

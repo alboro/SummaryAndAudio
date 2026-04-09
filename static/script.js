@@ -83,8 +83,15 @@ function showResultTtsButton(container) {
   const label = container.dataset.readResult || container.dataset.read || 'Read result';
   btn.setAttribute('aria-label', label);
   btn.setAttribute('title', label);
+
   if (playIcon)  btn.appendChild(playIcon.cloneNode(true));
   if (pauseIcon) btn.appendChild(pauseIcon.cloneNode(true));
+  // Fallback visible text when icons are unavailable
+  if (!playIcon && !pauseIcon) {
+    const span = document.createElement('span');
+    span.textContent = label;
+    btn.appendChild(span);
+  }
 
   box.appendChild(btn);
 }
@@ -162,8 +169,51 @@ async function streamSummary(container, response) {
 }
 
 /**
+ * Fetch full article markdown from the server for the given entry.
+ * Returns empty string on failure.
+ */
+async function getArticleText(textUrl) {
+  try {
+    const form = new URLSearchParams();
+    form.append('ajax', 'true');
+    form.append('_csrf', context.csrf);
+    const resp = await fetch(textUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form
+    });
+    if (!resp.ok) return '';
+    const json = await resp.json();
+    return (typeof json.text === 'string') ? json.text : '';
+  } catch (e) {
+    console.error('getArticleText failed', e);
+    return '';
+  }
+}
+
+/**
+ * Split text into chunks of at most maxChars characters, breaking at paragraph
+ * or sentence boundaries where possible.
+ */
+function splitTextForTts(text, maxChars) {
+  maxChars = maxChars || 4000;
+  if (text.length <= maxChars) return [text];
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > maxChars) {
+    let cutAt = remaining.lastIndexOf('\n\n', maxChars);
+    if (cutAt <= 0) cutAt = remaining.lastIndexOf('. ', maxChars);
+    if (cutAt <= 0) cutAt = maxChars;
+    else cutAt += 1; // include the period/newline in the chunk
+    chunks.push(remaining.substring(0, cutAt).trim());
+    remaining = remaining.substring(cutAt).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks.filter(function(c) { return c.length > 0; });
+}
+
+/**
  * Fetch TTS audio from server via POST, return Audio element backed by blob URL.
- * POST avoids URL-length limits on large content and CSRF issues with GET.
  */
 async function ttsLoadAudio(url, text) {
   const form = new URLSearchParams();
@@ -223,13 +273,42 @@ async function playTtsAudio(audio, target, readLabel, pauseLabel, log, t, onEnde
   log.style.display = 'none';
 }
 
+/**
+ * Play TTS chunks sequentially, updating button state throughout.
+ * chunks is an array of strings; each is TTS'd in order.
+ */
+async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, log, t) {
+  for (let i = 0; i < chunks.length; i++) {
+    if (target._ttsStopped) break;
+    log.textContent = (t.preparingAudio || 'Preparing audio...') + (chunks.length > 1 ? ' (' + (i + 1) + '/' + chunks.length + ')' : '');
+    log.style.display = 'block';
+    const audio = await ttsLoadAudio(speakUrl, chunks[i]);
+    if (target._ttsStopped) {
+      if (audio._blobUrl) URL.revokeObjectURL(audio._blobUrl);
+      break;
+    }
+    target._audio = audio;
+    await new Promise(function(resolve) {
+      playTtsAudio(audio, target, readLabel, pauseLabel, log, t, resolve);
+    });
+    target._audio = null;
+  }
+  target._ttsStopped = false;
+  target.classList.remove('oai-playing');
+  target.setAttribute('aria-label', readLabel);
+  target.setAttribute('title', readLabel);
+  log.textContent = '';
+  log.style.display = 'none';
+}
+
 async function resultTtsButtonClick(target) {
   const container = target.closest('.oai-summary-wrap');
   const log = container.querySelector('.oai-summary-log');
   const t = container.dataset;
-  const readLabel  = t.readResult || t.read;
-  const pauseLabel = t.pause;
+  const readLabel  = t.readResult || t.read || 'Read result';
+  const pauseLabel = t.pause || 'Pause';
 
+  // Toggle existing playback
   if (target._audio) {
     if (target._audio.paused) {
       try {
@@ -249,24 +328,47 @@ async function resultTtsButtonClick(target) {
     return;
   }
 
+  // Stop ongoing chunk sequence
+  if (target._ttsActive) {
+    target._ttsStopped = true;
+    if (target._audio) { target._audio.pause(); target._audio = null; }
+    target._ttsActive = false;
+    target.classList.remove('oai-playing');
+    target.setAttribute('aria-label', readLabel);
+    target.setAttribute('title', readLabel);
+    log.textContent = '';
+    log.style.display = 'none';
+    return;
+  }
+
+  // Read the summary content text
   const contentEl = container.querySelector('.oai-summary-content');
   const text = contentEl ? contentEl.textContent.trim() : '';
-  if (!text) return;
 
-  target.disabled = true;
-  log.textContent = t.preparingAudio;
+  // Show feedback even if text is empty so user knows the click registered
+  log.textContent = t.preparingAudio || 'Preparing audio...';
   log.style.display = 'block';
 
+  if (!text) {
+    log.textContent = t.audioFailed || 'No content to read.';
+    return;
+  }
+
+  target.disabled = true;
+  target._ttsActive = true;
+  target._ttsStopped = false;
+
   try {
-    const audio = await ttsLoadAudio(target.dataset.request, text);
-    target._audio = audio;
-    await playTtsAudio(audio, target, readLabel, pauseLabel, log, t, null);
+    const chunks = splitTextForTts(text, 4000);
+    target.disabled = false;
+    await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t);
   } catch (err) {
     console.error(err);
-    log.textContent = t.audioFailed;
+    log.textContent = t.audioFailed || 'Audio playback failed';
     log.style.display = 'block';
   } finally {
     target.disabled = false;
+    target._ttsActive = false;
   }
 }
 
@@ -278,8 +380,8 @@ async function ttsButtonClick(target, forceStop = false) {
   const container = target.closest('.oai-summary-wrap');
   const log = container.querySelector('.oai-summary-log');
   const t = container.dataset;
-  const readLabel  = t.read;
-  const pauseLabel = t.pause;
+  const readLabel  = t.read || 'Read';
+  const pauseLabel = t.pause || 'Pause';
 
   // Toggle / stop existing audio
   if (target._audio) {
@@ -357,9 +459,54 @@ async function ttsButtonClick(target, forceStop = false) {
       return;
     }
 
+    // Stop any active chunk sequence on this button
+    if (target._ttsActive) {
+      target._ttsStopped = true;
+      if (target._audio) { target._audio.pause(); target._audio = null; }
+      target._ttsActive = false;
+      target.classList.remove('oai-playing');
+      target.setAttribute('aria-label', readLabel);
+      target.setAttribute('title', readLabel);
+      log.textContent = '';
+      log.style.display = 'none';
+      return;
+    }
+
+    // Fetch full article text from server (same content the summariser uses)
+    const textUrl = container.dataset.textUrl;
+    if (textUrl) {
+      target.disabled = true;
+      target._ttsActive = true;
+      target._ttsStopped = false;
+      log.textContent = t.preparingAudio || 'Preparing audio...';
+      log.style.display = 'block';
+      try {
+        const text = await getArticleText(textUrl);
+        if (!text || target._ttsStopped) {
+          log.textContent = text ? '' : (t.audioFailed || 'No article text');
+          log.style.display = text ? 'none' : 'block';
+          return;
+        }
+        const chunks = splitTextForTts(text, 4000);
+        target.classList.add('oai-playing');
+        target.setAttribute('aria-label', pauseLabel);
+        target.setAttribute('title', pauseLabel);
+        target.disabled = false;
+        await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t);
+      } catch (err) {
+        console.error(err);
+        log.textContent = t.audioFailed || 'Audio playback failed';
+        log.style.display = 'block';
+      } finally {
+        target.disabled = false;
+        target._ttsActive = false;
+      }
+      return;
+    }
+
+    // Fallback: no textUrl — read from DOM (paragraph sequence or whole article)
     const paragraphs = Array.from(container.querySelectorAll('.oai-tts-paragraph'));
 
-    // No paragraph buttons → read entire article as one TTS request
     if (paragraphs.length === 0) {
       const article = container.querySelector('.oai-summary-article');
       const text = article ? article.textContent.trim() : '';
@@ -369,7 +516,7 @@ async function ttsButtonClick(target, forceStop = false) {
       log.textContent = t.preparingAudio;
       log.style.display = 'block';
       try {
-        const audio = await ttsLoadAudio(target.dataset.request, text);
+        const audio = await ttsLoadAudio(target.dataset.request, text.substring(0, 4000));
         target._audio = audio;
         await playTtsAudio(audio, target, readLabel, pauseLabel, log, t, null);
       } catch (err) {
@@ -408,7 +555,6 @@ async function ttsButtonClick(target, forceStop = false) {
   }
 
   // ── Paragraph button ──────────────────────────────────────────────────────
-  // If clicked directly (not via sequence), set up sequence from this paragraph
   const articleBtn = container.querySelector('.oai-tts-btn:not(.oai-tts-paragraph):not(.oai-result-tts-btn)');
   if (articleBtn && !target._sequenceParent) {
     if (articleBtn._sequence && articleBtn._sequence.currentBtn && articleBtn._sequence.currentBtn !== target) {
@@ -442,7 +588,6 @@ async function ttsButtonClick(target, forceStop = false) {
     target._sequenceParent = articleBtn;
   }
 
-  // Load and play paragraph audio
   const p = target.closest('p');
   const text = p ? p.textContent.trim() : '';
   if (!text) {
