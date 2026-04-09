@@ -21,6 +21,18 @@ foreach ([
 
 class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 {
+    /**
+     * Default English prompt used when no prompt is configured via Ansible/UI.
+     * Override via oai_tts_normalize_prompt config key.
+     * Supports %article_title% placeholder (replaced at runtime).
+     */
+    private const TTS_NORMALIZE_PROMPT_DEFAULT =
+        'You are a reader. Transform the incoming text for audio playback: '
+        . 'remove or replace with words all formatting and special characters — '
+        . 'Markdown markup, HTML tags, URLs, mathematical and typographic symbols, '
+        . 'emoji and any characters that would be pronounced literally during speech synthesis. '
+        . 'Do not add explanations or comments — return only the transformed text.';
+
     // ── Service factories ───────────────────────────────────────────────────
 
     protected function makeContentProvider(): ArticleContentProvider
@@ -41,7 +53,7 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
         return new ButtonConfigParser();
     }
 
-    protected function makeTtsNormalizer(): TextNormalizerInterface
+    protected function makeTtsNormalizer(string $articleTitle = ''): TextNormalizerInterface
     {
         $choice = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalizer ?? 'simple'));
 
@@ -59,8 +71,12 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
         $prompt = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalize_prompt ?? ''));
         if ($this->isEmpty($prompt)) {
-            // Fall back to the i18n-localized default prompt
-            $prompt = RssAiButtonsExtension::t('tts_normalize_prompt');
+            $prompt = self::TTS_NORMALIZE_PROMPT_DEFAULT;
+        }
+
+        // Substitute %article_title% placeholder if present
+        if ($articleTitle !== '' && strpos($prompt, '%article_title%') !== false) {
+            $prompt = str_replace('%article_title%', $articleTitle, $prompt);
         }
 
         return new LlmTextNormalizer(
@@ -72,11 +88,11 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
         );
     }
 
-    protected function makeTtsService(): TtsService
+    protected function makeTtsService(string $articleTitle = ''): TtsService
     {
         return new TtsService(
             $this->makeOpenAiClient(),
-            $this->makeTtsNormalizer()
+            $this->makeTtsNormalizer($articleTitle)
         );
     }
 
@@ -319,10 +335,11 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
         if ($speed === null || !is_numeric($speed)) {
             $speed = 1.1;
         }
-        $speed   = max(0.5, min(4.0, (float)$speed));
-        $content = trim((string)(Minz_Request::param('content') ?? ''));
-        $format  = (string)(Minz_Request::param('format') ?? 'opus');
-        $format  = in_array($format, ['mp3', 'ogg', 'opus']) ? $format : 'opus';
+        $speed        = max(0.5, min(4.0, (float)$speed));
+        $content      = trim((string)(Minz_Request::param('content') ?? ''));
+        $articleTitle = trim((string)(Minz_Request::param('title') ?? ''));
+        $format       = (string)(Minz_Request::param('format') ?? 'opus');
+        $format       = in_array($format, ['mp3', 'ogg', 'opus']) ? $format : 'opus';
 
         if ($this->isEmpty($tts_url) || $this->isEmpty($tts_key) || $this->isEmpty($tts_model) || $this->isEmpty($voice) || $this->isEmpty($content)) {
             $this->debugLog('speakAction: missing config — tts_url=' . var_export($tts_url, true)
@@ -337,7 +354,7 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
         $this->debugLog('speakAction: calling TtsService model=' . $tts_model . ' voice=' . $voice . ' content.len=' . strlen($content));
 
-        $ttsService  = $this->makeTtsService();
+        $ttsService  = $this->makeTtsService($articleTitle);
         $headersSent = false;
         $finalStatus = 0;
         $errorBody   = '';

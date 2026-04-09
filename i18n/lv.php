@@ -32,10 +32,5 @@ return [
     'request_failed'      => 'Pieprasījuma kļūda',
     'preparing_audio'     => 'Sagatavo audio…',
     'audio_failed'        => 'Audio atskaņošanas kļūda',
-    'tts_normalize_prompt' => 'Tu esi lasītājs. Pārveido ienākošo tekstu audio atskaņošanai: '
-        . 'noņem vai aizstāj ar vārdiem visas formatēšanas un speciālās rakstzīmes — '
-        . 'Markdown iezīmēšanu, HTML tagus, URL adreses, matemātiskos un tipogrāfiskos simbolus, '
-        . 'emocijzīmes un jebkuras rakstzīmes, kas runas sintēzes laikā tiktu izrunātas burtiski. '
-        . 'Nepievieno paskaidrojumus vai komentārus — atgriez tikai pārveidoto tekstu.',
 ];
 

@@ -81,6 +81,7 @@ class RssAiButtonsExtension extends Minz_Extension
     $attr_str .= ' data-speak-result="' . $url_tts . '"';
     $attr_str .= ' data-text-url="' . $url_text . '"';
     $attr_str .= ' data-entry-id="' . htmlspecialchars((string)$entry->id(), ENT_QUOTES) . '"';
+    $attr_str .= ' data-entry-title="' . htmlspecialchars((string)$entry->title(), ENT_QUOTES) . '"';
     // Per-context voice: voice for article TTS and voice_result for result TTS
     $voice        = FreshRSS_Context::$user_conf->oai_voice        ?? '';
     $voice_result = FreshRSS_Context::$user_conf->oai_voice_result ?? '';

@@ -57,14 +57,16 @@ function detectAudioFormat() {
  * @param {string} url - speak endpoint URL
  * @param {string} text - text content to speak
  * @param {string} [voice] - optional voice override
+ * @param {string} [title] - optional article title (for %article_title% in LLM prompt)
  */
-function ttsLoadAudio(url, text, voice) {
+function ttsLoadAudio(url, text, voice, title) {
   var form = new URLSearchParams();
   form.append('ajax', 'true');
   form.append('_csrf', context.csrf);
   form.append('content', text);
   form.append('format', detectAudioFormat());
   if (voice) form.append('voice', voice);
+  if (title) form.append('title', title);
 
   return fetch(url, {
     method: 'POST',
@@ -136,8 +138,9 @@ async function playTtsAudio(audio, target, readLabel, pauseLabel, log, t, onEnde
 /**
  * Play TTS chunks with PREFETCH — start loading the next chunk as soon as
  * the current one starts playing, so there is no gap between them.
+ * @param {string} [title] - article title passed to TTS API for %article_title% substitution
  */
-async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, log, t, voice) {
+async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, log, t, voice, title) {
   var prefetched = null; // Promise<Audio> for the next chunk
 
   for (var i = 0; i < chunks.length; i++) {
@@ -167,7 +170,7 @@ async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, lo
       log.style.display = 'block';
       setButtonWaiting(target, true);
       try {
-        audio = await ttsLoadAudio(speakUrl, chunks[i], voice);
+        audio = await ttsLoadAudio(speakUrl, chunks[i], voice, title);
       } catch (err) {
         console.error('[SAA] load failed chunk', i, err);
         setButtonWaiting(target, false);
@@ -183,7 +186,7 @@ async function playTtsChunks(chunks, speakUrl, target, readLabel, pauseLabel, lo
 
     // Start prefetching the NEXT chunk immediately
     if (i + 1 < chunks.length && !target._ttsStopped) {
-      prefetched = ttsLoadAudio(speakUrl, chunks[i + 1], voice).catch(function (err) {
+      prefetched = ttsLoadAudio(speakUrl, chunks[i + 1], voice, title).catch(function (err) {
         console.error('[SAA] prefetch error', err);
         return null;
       });
@@ -273,7 +276,8 @@ async function resultTtsButtonClick(target) {
     target.disabled = false;
     setButtonWaiting(target, false);
     var voiceResult = container.dataset.voiceResult || '';
-    await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t, voiceResult);
+    var titleResult = container.dataset.entryTitle || '';
+    await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t, voiceResult, titleResult);
   } catch (err) {
     console.error(err);
     log.textContent = t.audioFailed || 'Audio playback failed';
@@ -407,7 +411,8 @@ async function ttsButtonClick(target, forceStop) {
         target.setAttribute('title', pauseLabel);
         target.disabled = false;
         var voiceArticle = container.dataset.voice || '';
-        await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t, voiceArticle);
+        var titleArticle = container.dataset.entryTitle || '';
+        await playTtsChunks(chunks, target.dataset.request, target, readLabel, pauseLabel, log, t, voiceArticle, titleArticle);
       } catch (err) {
         console.error(err);
         log.textContent = t.audioFailed || 'Audio playback failed';
@@ -434,7 +439,8 @@ async function ttsButtonClick(target, forceStop) {
       setButtonWaiting(target, true);
       try {
         var voiceFb = container.dataset.voice || '';
-        var audio = await ttsLoadAudio(target.dataset.request, text2.substring(0, 4000), voiceFb);
+        var titleFb = container.dataset.entryTitle || '';
+        var audio = await ttsLoadAudio(target.dataset.request, text2.substring(0, 4000), voiceFb, titleFb);
         setButtonWaiting(target, false);
         target._audio = audio;
         await playTtsAudio(audio, target, readLabel, pauseLabel, log, t, null);
@@ -526,7 +532,8 @@ async function ttsButtonClick(target, forceStop) {
 
   try {
     var voicePar = container.dataset.voice || '';
-    var pAudio = await ttsLoadAudio(target.dataset.request, pText, voicePar);
+    var titlePar = container.dataset.entryTitle || '';
+    var pAudio = await ttsLoadAudio(target.dataset.request, pText, voicePar, titlePar);
     setButtonWaiting(target, false);
     target._audio = pAudio;
     await playTtsAudio(pAudio, target, readLabel, pauseLabel, log, t, function () {
