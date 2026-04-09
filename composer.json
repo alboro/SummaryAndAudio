@@ -1,6 +1,6 @@
 {
     "name": "alboro/summary-and-audio",
-    "description": "FreshRSS extension – SummaryAndAudio fork (alboro)",
+    "description": "FreshRSS extension – RssAiButtons (alboro fork)",
     "type": "library",
     "license": "MIT",
     "require": {

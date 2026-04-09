@@ -1,5 +1,5 @@
 <?php
-class SummaryAndAudioExtension extends Minz_Extension
+class RssAiButtonsExtension extends Minz_Extension
 {
   private static ?array $i18n = null;
 
@@ -11,7 +11,7 @@ class SummaryAndAudioExtension extends Minz_Extension
   public function init()
   {
     $this->registerHook('entry_before_display', array($this, 'addSummaryButton'));
-    $this->registerController('SummaryAndAudio');
+    $this->registerController('RssAiButtons');
     Minz_View::appendStyle($this->getFileUrl('style.css', 'css'));
     Minz_View::appendScript($this->getFileUrl('axios.js', 'js'));
     Minz_View::appendScript($this->getFileUrl('marked.js', 'js'));
@@ -45,9 +45,9 @@ class SummaryAndAudioExtension extends Minz_Extension
       return $entry;
     }
 
-    $url_tts        = Minz_Url::display(['c' => 'SummaryAndAudio', 'a' => 'speak']);
+    $url_tts        = Minz_Url::display(['c' => 'RssAiButtons', 'a' => 'speak']);
     $url_text       = Minz_Url::display([
-      'c'      => 'SummaryAndAudio',
+      'c'      => 'RssAiButtons',
       'a'      => 'getArticleText',
       'params' => ['id' => $entry->id()],
     ]);
@@ -95,7 +95,7 @@ class SummaryAndAudioExtension extends Minz_Extension
     $summary_buttons_html = '';
     foreach ($buttons as $idx => $btn) {
       $url_btn = Minz_Url::display([
-        'c' => 'SummaryAndAudio',
+        'c' => 'RssAiButtons',
         'a' => 'summarize',
         'params' => ['id' => $entry->id(), 'btn' => $idx],
       ]);

@@ -1,8 +1,8 @@
 {
-  "name": "SummaryAndAudio",
-  "author": "win-100",
-  "description": "FreshRSS extension that generates concise and detailed summaries using the OpenAI API and lets you listen to articles through customizable text-to-speech. Easily configure the model, API key, and reading speed to get the most out of your RSS feeds.",
-  "version": "0.1.4",
-  "entrypoint": "SummaryAndAudio",
+  "name": "RssAiButtons",
+  "author": "alboro (fork of win-100/SummaryAndAudio)",
+  "description": "FreshRSS extension: configurable AI buttons per article (summary, translation, analysis) with text-to-speech. Uses any OpenAI-compatible backend. Substantially reworked fork.",
+  "version": "0.2.0",
+  "entrypoint": "RssAiButtons",
   "type": "user"
 }

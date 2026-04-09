@@ -19,7 +19,7 @@ foreach ([
     require_once $_svc_file;
 }
 
-class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
+class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 {
     // ── Service factories ───────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
 
     protected function makeTtsNormalizer(): TextNormalizerInterface
     {
-        $choice = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalizer ?? 'llm'));
+        $choice = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalizer ?? 'simple'));
 
         if ($choice !== 'llm') {
             return new SimpleTextNormalizer();
@@ -60,7 +60,7 @@ class FreshExtension_SummaryAndAudio_Controller extends Minz_ActionController
         $prompt = trim((string)(FreshRSS_Context::$user_conf->oai_tts_normalize_prompt ?? ''));
         if ($this->isEmpty($prompt)) {
             // Fall back to the i18n-localized default prompt
-            $prompt = SummaryAndAudioExtension::t('tts_normalize_prompt');
+            $prompt = RssAiButtonsExtension::t('tts_normalize_prompt');
         }
 
         return new LlmTextNormalizer(

@@ -27,69 +27,69 @@ $oai_speed     = FreshRSS_Context::$user_conf->oai_speed     ?: 1.1;
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
 
   <fieldset>
-    <legend><?php echo SummaryAndAudioExtension::t('summary_buttons'); ?></legend>
+    <legend><?php echo RssAiButtonsExtension::t('summary_buttons'); ?></legend>
     <div id="oai-buttons-container">
       <?php foreach ($buttons as $idx => $btn): ?>
       <div class="oai-btn-slot">
-        <h4><?php echo SummaryAndAudioExtension::t('button'); ?> <?php echo $idx + 1; ?>
-          <button type="button" class="oai-remove-slot btn btn-small"><?php echo SummaryAndAudioExtension::t('remove'); ?></button>
+        <h4><?php echo RssAiButtonsExtension::t('button'); ?> <?php echo $idx + 1; ?>
+          <button type="button" class="oai-remove-slot btn btn-small"><?php echo RssAiButtonsExtension::t('remove'); ?></button>
         </h4>
-        <label><?php echo SummaryAndAudioExtension::t('button_label'); ?>
+        <label><?php echo RssAiButtonsExtension::t('button_label'); ?>
           <input type="text" name="oai_btn[<?php echo $idx; ?>][label]" value="<?php echo htmlspecialchars((string)($btn['label'] ?? ''), ENT_QUOTES); ?>">
         </label>
-        <label><?php echo SummaryAndAudioExtension::t('base_url'); ?>
+        <label><?php echo RssAiButtonsExtension::t('base_url'); ?>
           <input type="text" name="oai_btn[<?php echo $idx; ?>][url]" value="<?php echo htmlspecialchars((string)($btn['url'] ?? ''), ENT_QUOTES); ?>">
         </label>
-        <label><?php echo SummaryAndAudioExtension::t('api_key'); ?>
+        <label><?php echo RssAiButtonsExtension::t('api_key'); ?>
           <input type="text" name="oai_btn[<?php echo $idx; ?>][key]" value="<?php echo htmlspecialchars((string)($btn['key'] ?? ''), ENT_QUOTES); ?>">
         </label>
-        <label><?php echo SummaryAndAudioExtension::t('model_name'); ?>
+        <label><?php echo RssAiButtonsExtension::t('model_name'); ?>
           <input type="text" name="oai_btn[<?php echo $idx; ?>][model]" value="<?php echo htmlspecialchars((string)($btn['model'] ?? ''), ENT_QUOTES); ?>">
         </label>
-        <label><?php echo SummaryAndAudioExtension::t('prompt'); ?>
+        <label><?php echo RssAiButtonsExtension::t('prompt'); ?>
           <textarea name="oai_btn[<?php echo $idx; ?>][prompt]"><?php echo htmlspecialchars((string)($btn['prompt'] ?? ''), ENT_QUOTES); ?></textarea>
         </label>
       </div>
       <?php endforeach; ?>
     </div>
-    <button type="button" id="oai-add-btn" class="btn btn-small">+ <?php echo SummaryAndAudioExtension::t('add_button'); ?></button>
+    <button type="button" id="oai-add-btn" class="btn btn-small">+ <?php echo RssAiButtonsExtension::t('add_button'); ?></button>
   </fieldset>
 
   <fieldset>
-    <legend><?php echo SummaryAndAudioExtension::t('audio_settings'); ?></legend>
-    <p><?php echo SummaryAndAudioExtension::t('audio_url_hint'); ?></p>
-    <label for="oai_tts_url"><?php echo SummaryAndAudioExtension::t('tts_base_url'); ?></label>
+    <legend><?php echo RssAiButtonsExtension::t('audio_settings'); ?></legend>
+    <p><?php echo RssAiButtonsExtension::t('audio_url_hint'); ?></p>
+    <label for="oai_tts_url"><?php echo RssAiButtonsExtension::t('tts_base_url'); ?></label>
     <input type="text" name="oai_tts_url" id="oai_tts_url"
            value="<?php echo htmlspecialchars($oai_tts_url, ENT_QUOTES); ?>"
-           placeholder="<?php echo SummaryAndAudioExtension::t('tts_url_placeholder'); ?>">
-    <label for="oai_tts_key"><?php echo SummaryAndAudioExtension::t('tts_api_key'); ?></label>
+           placeholder="<?php echo RssAiButtonsExtension::t('tts_url_placeholder'); ?>">
+    <label for="oai_tts_key"><?php echo RssAiButtonsExtension::t('tts_api_key'); ?></label>
     <input type="text" name="oai_tts_key" id="oai_tts_key"
            value="<?php echo htmlspecialchars($oai_tts_key, ENT_QUOTES); ?>"
-           placeholder="<?php echo SummaryAndAudioExtension::t('tts_key_placeholder'); ?>">
-    <label for="oai_tts_model"><?php echo SummaryAndAudioExtension::t('tts_model'); ?></label>
+           placeholder="<?php echo RssAiButtonsExtension::t('tts_key_placeholder'); ?>">
+    <label for="oai_tts_model"><?php echo RssAiButtonsExtension::t('tts_model'); ?></label>
     <input type="text" name="oai_tts_model" id="oai_tts_model" value="<?php echo htmlspecialchars($oai_tts_model, ENT_QUOTES); ?>">
-    <label for="oai_voice"><?php echo SummaryAndAudioExtension::t('voice'); ?></label>
+    <label for="oai_voice"><?php echo RssAiButtonsExtension::t('voice'); ?></label>
     <input type="text" name="oai_voice" id="oai_voice" value="<?php echo htmlspecialchars($oai_voice, ENT_QUOTES); ?>">
-    <label for="oai_speed"><?php echo SummaryAndAudioExtension::t('speech_speed'); ?></label>
+    <label for="oai_speed"><?php echo RssAiButtonsExtension::t('speech_speed'); ?></label>
     <input type="number" name="oai_speed" id="oai_speed" min="0.5" max="4" step="0.1" value="<?php echo $oai_speed; ?>">
   </fieldset>
 
   <hr />
-  <button type="submit"><?php echo SummaryAndAudioExtension::t('save'); ?></button>
+  <button type="submit"><?php echo RssAiButtonsExtension::t('save'); ?></button>
 </form>
 
 <script>
 (function () {
   var container = document.getElementById('oai-buttons-container');
   var addBtn    = document.getElementById('oai-add-btn');
-  var btnLabel  = <?php echo json_encode(SummaryAndAudioExtension::t('button')); ?>;
-  var removeLabel = <?php echo json_encode(SummaryAndAudioExtension::t('remove')); ?>;
+  var btnLabel  = <?php echo json_encode(RssAiButtonsExtension::t('button')); ?>;
+  var removeLabel = <?php echo json_encode(RssAiButtonsExtension::t('remove')); ?>;
   var labels = {
-    button_label: <?php echo json_encode(SummaryAndAudioExtension::t('button_label')); ?>,
-    base_url:     <?php echo json_encode(SummaryAndAudioExtension::t('base_url')); ?>,
-    api_key:      <?php echo json_encode(SummaryAndAudioExtension::t('api_key')); ?>,
-    model_name:   <?php echo json_encode(SummaryAndAudioExtension::t('model_name')); ?>,
-    prompt:       <?php echo json_encode(SummaryAndAudioExtension::t('prompt')); ?>
+    button_label: <?php echo json_encode(RssAiButtonsExtension::t('button_label')); ?>,
+    base_url:     <?php echo json_encode(RssAiButtonsExtension::t('base_url')); ?>,
+    api_key:      <?php echo json_encode(RssAiButtonsExtension::t('api_key')); ?>,
+    model_name:   <?php echo json_encode(RssAiButtonsExtension::t('model_name')); ?>,
+    prompt:       <?php echo json_encode(RssAiButtonsExtension::t('prompt')); ?>
   };
 
   function reindex() {
