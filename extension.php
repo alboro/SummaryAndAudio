@@ -140,7 +140,7 @@ class RssAiButtonsExtension extends Minz_Extension
 
   public function handleConfigureAction()
   {
-    if (Minz_Request::isPost()) {
+      if (Minz_Request::isPost()) {
       // Process configurable buttons array
       $raw_buttons = Minz_Request::param('oai_btn', []);
       $buttons = [];
@@ -152,8 +152,11 @@ class RssAiButtonsExtension extends Minz_Extension
           $key    = trim((string)($btn['key']    ?? ''));
           $model  = trim((string)($btn['model']  ?? ''));
           $prompt = trim((string)($btn['prompt'] ?? ''));
+          $effort = trim((string)($btn['effort'] ?? 'low'));
+          $voice  = trim((string)($btn['voice']  ?? ''));
           if ($label === '' && $prompt === '') continue;
-          $buttons[] = compact('label', 'url', 'key', 'model', 'prompt');
+          if (!in_array($effort, ['low', 'medium', 'high'], true)) $effort = 'low';
+          $buttons[] = compact('label', 'url', 'key', 'model', 'prompt', 'effort', 'voice');
         }
       }
       FreshRSS_Context::$user_conf->oai_buttons = json_encode($buttons, JSON_UNESCAPED_UNICODE);

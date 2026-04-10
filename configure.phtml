@@ -49,6 +49,16 @@ $oai_speed     = FreshRSS_Context::$user_conf->oai_speed     ?: 1.1;
         <label><?php echo RssAiButtonsExtension::t('prompt'); ?>
           <textarea name="oai_btn[<?php echo $idx; ?>][prompt]"><?php echo htmlspecialchars((string)($btn['prompt'] ?? ''), ENT_QUOTES); ?></textarea>
         </label>
+        <label><?php echo RssAiButtonsExtension::t('effort'); ?>
+          <select name="oai_btn[<?php echo $idx; ?>][effort]">
+            <?php foreach (['low' => RssAiButtonsExtension::t('effort_low'), 'medium' => RssAiButtonsExtension::t('effort_medium'), 'high' => RssAiButtonsExtension::t('effort_high')] as $eVal => $eLabel): ?>
+            <option value="<?php echo $eVal; ?>"<?php echo ((string)($btn['effort'] ?? 'low')) === $eVal ? ' selected' : ''; ?>><?php echo htmlspecialchars($eLabel, ENT_QUOTES); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label><?php echo RssAiButtonsExtension::t('button_voice'); ?>
+          <input type="text" name="oai_btn[<?php echo $idx; ?>][voice]" value="<?php echo htmlspecialchars((string)($btn['voice'] ?? ''), ENT_QUOTES); ?>" placeholder="<?php echo RssAiButtonsExtension::t('button_voice_placeholder'); ?>">
+        </label>
       </div>
       <?php endforeach; ?>
     </div>
@@ -85,17 +95,23 @@ $oai_speed     = FreshRSS_Context::$user_conf->oai_speed     ?: 1.1;
   var btnLabel  = <?php echo json_encode(RssAiButtonsExtension::t('button')); ?>;
   var removeLabel = <?php echo json_encode(RssAiButtonsExtension::t('remove')); ?>;
   var labels = {
-    button_label: <?php echo json_encode(RssAiButtonsExtension::t('button_label')); ?>,
-    base_url:     <?php echo json_encode(RssAiButtonsExtension::t('base_url')); ?>,
-    api_key:      <?php echo json_encode(RssAiButtonsExtension::t('api_key')); ?>,
-    model_name:   <?php echo json_encode(RssAiButtonsExtension::t('model_name')); ?>,
-    prompt:       <?php echo json_encode(RssAiButtonsExtension::t('prompt')); ?>
+    button_label:         <?php echo json_encode(RssAiButtonsExtension::t('button_label')); ?>,
+    base_url:             <?php echo json_encode(RssAiButtonsExtension::t('base_url')); ?>,
+    api_key:              <?php echo json_encode(RssAiButtonsExtension::t('api_key')); ?>,
+    model_name:           <?php echo json_encode(RssAiButtonsExtension::t('model_name')); ?>,
+    prompt:               <?php echo json_encode(RssAiButtonsExtension::t('prompt')); ?>,
+    effort:               <?php echo json_encode(RssAiButtonsExtension::t('effort')); ?>,
+    effort_low:           <?php echo json_encode(RssAiButtonsExtension::t('effort_low')); ?>,
+    effort_medium:        <?php echo json_encode(RssAiButtonsExtension::t('effort_medium')); ?>,
+    effort_high:          <?php echo json_encode(RssAiButtonsExtension::t('effort_high')); ?>,
+    button_voice:         <?php echo json_encode(RssAiButtonsExtension::t('button_voice')); ?>,
+    button_voice_placeholder: <?php echo json_encode(RssAiButtonsExtension::t('button_voice_placeholder')); ?>
   };
 
   function reindex() {
     var slots = container.querySelectorAll('.oai-btn-slot');
     slots.forEach(function (slot, i) {
-      slot.querySelectorAll('input, textarea').forEach(function (el) {
+      slot.querySelectorAll('input, textarea, select').forEach(function (el) {
         el.name = el.name.replace(/oai_btn\[\d+\]/, 'oai_btn[' + i + ']');
       });
       var h4 = slot.querySelector('h4');
@@ -127,7 +143,13 @@ $oai_speed     = FreshRSS_Context::$user_conf->oai_speed     ?: 1.1;
       '<label>' + labels.base_url   + '<input type="text" name="oai_btn[' + idx + '][url]"   value="' + defUrl   + '"></label>' +
       '<label>' + labels.api_key    + '<input type="text" name="oai_btn[' + idx + '][key]"   value="' + defKey   + '"></label>' +
       '<label>' + labels.model_name + '<input type="text" name="oai_btn[' + idx + '][model]" value="' + defModel + '"></label>' +
-      '<label>' + labels.prompt     + '<textarea name="oai_btn[' + idx + '][prompt]"></textarea></label>';
+      '<label>' + labels.prompt     + '<textarea name="oai_btn[' + idx + '][prompt]"></textarea></label>' +
+      '<label>' + labels.effort     + '<select name="oai_btn[' + idx + '][effort]">' +
+        '<option value="low">'    + labels.effort_low    + '</option>' +
+        '<option value="medium">' + labels.effort_medium + '</option>' +
+        '<option value="high">'   + labels.effort_high   + '</option>' +
+      '</select></label>' +
+      '<label>' + labels.button_voice + '<input type="text" name="oai_btn[' + idx + '][voice]" value="" placeholder="' + labels.button_voice_placeholder + '"></label>';
     container.appendChild(slot);
   });
 })();

@@ -2,12 +2,15 @@
 
 // Load service layer (FreshRSS does not have an autoloader for extensions)
 foreach ([
+    __DIR__ . '/../Services/ButtonField.php',
+    __DIR__ . '/../Services/AiButton.php',
+    __DIR__ . '/../Services/ButtonConfig.php',       // backward-compat alias
+    __DIR__ . '/../Services/AiButtonCollection.php',
+    __DIR__ . '/../Services/ButtonConfigParser.php',
     __DIR__ . '/../Services/ArticleFetcherInterface.php',
     __DIR__ . '/../Services/HttpArticleFetcher.php',
     __DIR__ . '/../Services/HtmlToMarkdownConverter.php',
     __DIR__ . '/../Services/ArticleContentProvider.php',
-    __DIR__ . '/../Services/ButtonConfig.php',
-    __DIR__ . '/../Services/ButtonConfigParser.php',
     __DIR__ . '/../Services/OpenAiRequestDto.php',
     __DIR__ . '/../Services/OpenAiClientInterface.php',
     __DIR__ . '/../Services/HttpOpenAiClient.php',
@@ -63,7 +66,7 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
         // LLM normalizer: reuse button[0]'s connection (same LLM as summarizer)
         $buttons = $this->loadButtons();
-        $btn0    = $buttons[0] ?? null;
+        $btn0    = $buttons->get(0);
 
         if ($btn0 === null || $this->isEmpty(trim($btn0->url)) || $this->isEmpty(trim($btn0->key))) {
             return new SimpleTextNormalizer(); // graceful fallback
