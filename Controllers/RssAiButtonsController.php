@@ -101,17 +101,14 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
     // ── Config helpers ──────────────────────────────────────────────────────
 
-    /**
-     * @return ButtonConfig[]
-     */
-    private function loadButtons(): array
+    private function loadButtons(): AiButtonCollection
     {
         $parser = $this->makeButtonConfigParser();
         $json   = FreshRSS_Context::$user_conf->oai_buttons;
 
         if ($json) {
             $buttons = $parser->parseJson((string)$json);
-            if (count($buttons) > 0) {
+            if (!$buttons->isEmpty()) {
                 return $buttons;
             }
         }
@@ -181,7 +178,7 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
         $buttons = $this->loadButtons();
         $btn_idx = (int)(Minz_Request::param('btn') ?? 0);
-        $button  = $buttons[$btn_idx] ?? null;
+        $button  = $buttons->get($btn_idx);
 
         if (empty($button)) {
             header('Content-Type: application/json');
@@ -320,7 +317,7 @@ class FreshExtension_RssAiButtons_Controller extends Minz_ActionController
 
         if ($this->isEmpty($tts_url) || $this->isEmpty($tts_key)) {
             $buttons = $this->loadButtons();
-            $btn0    = $buttons[0] ?? null;
+            $btn0    = $buttons->get(0);
             if ($this->isEmpty($tts_url) && $btn0 !== null) {
                 $tts_url = trim($btn0->url);
             }
